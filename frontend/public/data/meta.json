@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "title": "Inventario Responsys",
+    "spreadsheetId": "1widnx3vomsT6j0Z3jpfh7IASwNd-Bix_lBXgp2tdVVQ",
+    "sourceMode": "xlsx",
+    "generatedAtUtc": "2026-09-08T17:26:48+00:00",
+    "earliestSentDate": "2024-01-01",
+    "latestSentDate": "2026-09-08",
+    "rowCount": 32804,
+    "formulaNotes": {
+      "deliveryRate": "(Envios - Soft Bounces - Hard Bounces) / Envios",
+      "openRate": "Unique Opens / Envios",
+      "clickRate": "Unique Clicks / Envios",
+      "bounceRate": "(Soft Bounces + Hard Bounces) / Envios",
+      "temporalTruth": "Sent Date; Año_Evento y nombre de pestaña se conservan solo para control de calidad"
+    },
+    "dataHash": "1ff90bb8129c2372"
+  },
+  "quality": {
+    "campaignMatchPct": 99.582,
+    "folderMatchPct": 99.976,
+    "unmatchedCampaignRows": 137,
+    "unmatchedFolderRows": 8,
+    "sourceYearMismatchRows": 904,
+    "rowsWithoutSentDate": 0,
+    "calculatedRateOver100Rows": 384,
+    "duplicateCampaignCatalogKeys": 1,
+    "topUnmatchedCampaigns": [
+      {
+        "name": "ENC_DIGITAL_POSTVENTA_BOT_V2",
+        "rows": 50
+      },
+      {
+        "name": "ENC_SOPORTE_DIG_ASESOR_V2",
+        "rows": 47
+      },
+      {
+        "name": "PagosSuma",
+        "rows": 7
+      },
+      {
+        "name": "ENC_FUNCIONAMIENTO_V2",
+        "rows": 3
+      },
+      {
+        "name": "Prueba_55555",
+        "rows": 3
+      },
+      {
+        "name": "Canales_comunicacion_831525",
+        "rows": 2
+      },
+      {
+        "name": "Cart_BienvenidaServicios_JULIO_20250725",
+        "rows": 2
+      },
+      {
+        "name": "Cart_BienvenidaServicios_Julio2025",
+        "rows": 2
+      },
+      {
+        "name": "Cart_DispoFactHogares_Bogota_V8_866725",
+        "rows": 2
+      },
+      {
+        "name": "ENC_INSTALACION_V2",
+        "rows": 2
+      },
+      {
+        "name": "Exp_Cierre_Ciclo",
+        "rows": 2
+      },
+      {
+        "name": "Exp_Prueba_Manual",
+        "rows": 2
+      },
+      {
+        "name": "Prueba_666666",
+        "rows": 2
+      },
+      {
+        "name": "Publi_AumentoCumple_200mb_848685",
+        "rows": 2
+      },
+      {
+        "name": "Cart_BienvenidaServicios_AGOSTO_2025",
+        "rows": 1
+      },
+      {
+        "name": "Cart_DispoFactHogares_Bogota_V7_Julio2025_837345",
+        "rows": 1
+      },
+      {
+        "name": "Cart_DispoFactHogares_Bogota_V8_859645",
+        "rows": 1
+      },
+      {
+        "name": "Prueba_4444",
+        "rows": 1
+      },
+      {
+        "name": "Prueba_666666_2_2",
+        "rows": 1
+      },
+      {
+        "name": "Prueba_666666_2_829665",
+        "rows": 1
+      }
+    ],
+    "topUnmatchedFolders": [
+      {
+        "name": "1",
+        "rows": 8
+      }
+    ]
+  }
+}

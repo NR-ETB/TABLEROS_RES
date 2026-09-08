@@ -1,0 +1,23 @@
+services:
+  etl:
+    build: ./backend
+    environment:
+      RESPONSYS_SOURCE: google
+      RESPONYS_SPREADSHEET_ID: ${RESPONYS_SPREADSHEET_ID:-1widnx3vomsT6j0Z3jpfh7IASwNd-Bix_lBXgp2tdVVQ}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google.json
+    volumes:
+      - ./frontend/public/data:/app/output
+      - ${GOOGLE_CREDENTIALS_FILE:-./google-service-account.json}:/run/secrets/google.json:ro
+    command: ["--source", "google", "--output", "/app/output/dashboard.json"]
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
+    depends_on:
+      etl:
+        condition: service_completed_successfully

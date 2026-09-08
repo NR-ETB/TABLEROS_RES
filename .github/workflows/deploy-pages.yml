@@ -1,0 +1,73 @@
+name: Actualizar Responsys y desplegar Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # 17 minutos después de cada hora para evitar el pico de cron de GitHub.
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Instalar ETL
+        run: pip install -r backend/requirements.txt
+
+      - name: Sincronizar Google Sheet
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          RESPONYS_SPREADSHEET_ID: 1widnx3vomsT6j0Z3jpfh7IASwNd-Bix_lBXgp2tdVVQ
+        run: |
+          if [ -n "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
+            python backend/scripts/sync_responsys.py --source google --output frontend/public/data/dashboard.json
+          else
+            echo "GOOGLE_SERVICE_ACCOUNT_JSON no está configurado; se publica el snapshot versionado."
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar frontend
+        working-directory: frontend
+        run: npm install
+
+      - name: Compilar React
+        working-directory: frontend
+        env:
+          VITE_BASE_PATH: /TABLEROS_RES/
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Desplegar GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

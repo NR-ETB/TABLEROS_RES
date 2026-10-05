@@ -34,4 +34,4 @@ Las incidencias no se borran ni corrigen automáticamente. Los controles globale
 
 ## Publicación
 
-Implementación guardada en Git y build local listo. El intento de publicación encontró dos límites de acceso: Git local no tiene credenciales y la conexión GitHub de NR-ETB devuelve `403 Resource not accessible by integration` al escribir. El sitio público conserva la versión anterior hasta habilitar autenticación y ejecutar `git push origin main`. El workflow actualizado genera, valida y publica la versión 1.0A automáticamente después de ese push.
+Implementación publicada en la rama `main` de `NR-ETB/TABLEROS_RES` el 5 de octubre de 2026. El push se completó mediante Git local usando la cuenta `NR-ETB`; la limitación de escritura del conector no impidió la publicación. El workflow genera, valida y despliega la versión 1.0A automáticamente después de cada push. Google Sheets vivo sigue requiriendo configurar las credenciales lectoras; mientras tanto se publica el snapshot identificado en la interfaz.

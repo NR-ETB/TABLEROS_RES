@@ -9,7 +9,7 @@ Fecha: 5 de octubre de 2026. Fuente conservada: snapshot de 32.804 registros, co
 - Resumen inicial: 23.331 bytes sin comprimir. Logs del servidor confirman `overview.json` al inicio, sin `dashboard.json`, worker ni módulos de vistas. Campañas solicita el detalle y su módulo al abrirse.
 - Paridad del motor TypeScript con el resumen generado en Python: histórico, últimos 30 días, últimos 90 días y año disponible.
 - Conteos conservados: 35.623.363 envíos, 4.875.960 aperturas únicas, 1.310.354 clics únicos, 9.980.002 rebotes y 25.643.361 entregados calculados.
-- Rendimiento local: consultas completas sobre 32.804 filas con mediana de aproximadamente 36–37 ms y máximo observado de 43 ms en cinco consultas tras calentamiento. Es una medida local, no una garantía universal de hardware.
+- Rendimiento local: consultas completas sobre 32.804 filas con medianas de aproximadamente 36–41 ms y máximo observado de 43,2 ms en cinco consultas tras calentamiento. Es una medida local, no una garantía universal de hardware.
 - Compilación React/Vite/TypeScript correcta; módulos separados para Worker, Campañas y Calidad.
 - Nueve pruebas Python y ocho pruebas TypeScript: contratos, fechas, comparaciones, anomalías, conservación de duplicados y actividad sin fechas, cabeceras requeridas, CSV, paginación y enlaces.
 
@@ -31,3 +31,7 @@ Fecha: 5 de octubre de 2026. Fuente conservada: snapshot de 32.804 registros, co
 Se conserva la configuración de lectura de la hoja existente. La sincronización viva requiere `GOOGLE_SERVICE_ACCOUNT_JSON` y compartir la hoja con la cuenta de servicio como lector. El snapshot permite entregar y publicar la versión 1.0A mientras se configura ese secreto. La interfaz lo indica explícitamente y avisa cuando la sincronización supera 48 horas.
 
 Las incidencias no se borran ni corrigen automáticamente. Los controles globales de catálogos mantienen sus definiciones originales y se identifican como Fuente completa. Los conteos de incidencias pueden solaparse y no deben sumarse.
+
+## Publicación
+
+Implementación guardada en Git y build local listo. El intento de publicación encontró dos límites de acceso: Git local no tiene credenciales y la conexión GitHub de NR-ETB devuelve `403 Resource not accessible by integration` al escribir. El sitio público conserva la versión anterior hasta habilitar autenticación y ejecutar `git push origin main`. El workflow actualizado genera, valida y publica la versión 1.0A automáticamente después de ese push.

@@ -27,14 +27,15 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
+          cache-dependency-path: backend/requirements.lock
 
       - name: Instalar ETL
-        run: pip install -r backend/requirements.txt
+        run: pip install -r backend/requirements.lock
 
       - name: Sincronizar Google Sheet
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          RESPONYS_SPREADSHEET_ID: 1widnx3vomsT6j0Z3jpfh7IASwNd-Bix_lBXgp2tdVVQ
+          RESPONSYS_SPREADSHEET_ID: 1widnx3vomsT6j0Z3jpfh7IASwNd-Bix_lBXgp2tdVVQ
         run: |
           if [ -n "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
             python backend/scripts/sync_responsys.py --source google --output frontend/public/data/dashboard.json
@@ -42,13 +43,23 @@ jobs:
             echo "GOOGLE_SERVICE_ACCOUNT_JSON no está configurado; se publica el snapshot versionado."
           fi
 
+      - name: Generar y validar contrato de datos
+        run: |
+          python backend/scripts/build_overview.py
+          python backend/scripts/validate_dataset.py
+          python -m unittest discover -s backend/tests -p 'test_*.py'
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Instalar frontend
         working-directory: frontend
-        run: npm install
+        run: npm ci
+
+      - name: Validar motor de consultas
+        working-directory: frontend
+        run: npm test
 
       - name: Compilar React
         working-directory: frontend

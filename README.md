@@ -1,77 +1,86 @@
-# TABLEROS_RES · Responsys
+# ETB · Responsys 1.0A
 
-Prototipo funcional de tablero Responsys construido para publicar en **GitHub Pages**.
+Tablero de rendimiento de campañas con identidad ETB, superficies liquid glass y publicación estática en [GitHub Pages](https://nr-etb.github.io/TABLEROS_RES/).
 
-## Arquitectura
+## Arquitectura y datos
 
-`Google Sheets → Python ETL → JSON compacto → React/Vite → GitHub Pages`
+`Google Sheets → Python ETL → overview.json + dashboard.json → React/Vite → GitHub Pages`
 
-- **Fuente viva:** `Invetario_Responsys_2.0`
-- **Spreadsheet ID:** `1widnx3vomsT6j0Z3jpfh7IASwNd-Bix_lBXgp2tdVVQ`
-- **Fuente temporal:** `Sent Date` (no `Año_Evento` cuando hay discrepancia)
-- **Cruce:** estadísticas → `Campañas Vigentes` por nombre normalizado; estadísticas → `Folders Vigentes` por folder normalizado.
-- Las inconsistencias de cruce **no se eliminan**: quedan visibles en el panel de calidad.
-- Las tasas del tablero se recalculan con conteos base para evitar inconsistencias de formato en las columnas de rate de las hojas.
+- Fuente: `Invetario_Responsys_2.0`, spreadsheet `1widnx3vomsT6j0Z3jpfh7IASwNd-Bix_lBXgp2tdVVQ`.
+- El ETL une estadísticas con `Campañas Vigentes` y `Folders Vigentes` mediante nombres normalizados. Conserva los nombres originales para agrupar campañas y hacer selecciones exactas.
+- `Sent Date` define el tiempo. El año de la pestaña se conserva como `sy` y sus discrepancias aparecen en Calidad.
+- No se deduplican las estadísticas ni se eliminan filas con incidencias. Se conserva también actividad sin nombre, fecha o envíos.
+- Catálogo de campañas con claves repetidas: la regla existente elige estado activo y luego ID mayor. La cantidad de claves duplicadas aparece como control global.
+- El inicio descarga únicamente `overview.json` (contrato versión 1, menos de 50.000 bytes), con cuatro resúmenes y opciones de filtro.
+- `dashboard.json` se descarga una vez cuando hacen falta filtros detallados, campañas, incidencias o exportación. Un Web Worker comparte el motor puro de cálculo con su respaldo en el hilo principal.
+- Resumen y detalle deben tener el mismo `dataHash`. Un cambio de corte exige recargar; nunca se mezclan ambos cortes.
 
-## Funcionalidad del prototipo
+## Navegación
 
-- Filtros por rango de fecha, propósito, folder, programa, tipo, estado y campaña.
-- Filtro específico de calidad de cruce.
-- KPIs recalculados con los filtros activos.
-- Evolución temporal adaptable (día/mes según ventana).
-- Top campañas, folders y propósito.
-- Tabla paginada y exportación CSV.
-- Panel de control de calidad y registros no cruzados.
-- Layout responsive para PC, portátil, tablet y móvil.
-- 32k+ filas históricas son procesadas una vez en Python y servidas como JSON estático comprimible por GitHub Pages/CDN.
+**Resumen** abre todo el histórico y muestra cinco KPIs, evolución, top cinco, distribuciones e incidencias. **Campañas** agrupa por nombre original, ordena por envíos y permite consultar registros en páginas de 25 filas. **Calidad** separa incidencias de la selección y controles de la **Fuente completa**.
 
-## Ejecutar con el snapshot local
+Los períodos rápidos terminan en la última fecha disponible: histórico, 30 días, 90 días y año disponible. Más filtros permite fechas personalizadas, folder, programa, tipo, estado y calidad. Aplicar confirma; Cancelar descarta el borrador. La búsqueda espera 150 ms sin cambios y los resultados de consultas anteriores se ignoran. Los filtros activos se pueden quitar individualmente.
+
+Las URLs usan fragmentos (`#/campanas?period=last30&campaignExact=...`); funcionan al compartir, recargar y navegar atrás/adelante bajo `/TABLEROS_RES/`. Las exportaciones CSV incluyen todos los registros filtrados, independientemente de la página. Calidad exporta la incidencia seleccionada sin duplicar filas que presentan varias incidencias.
+
+El resumen inicial cabe en 1366×768 y 1920×1080 a zoom normal. Móvil y zoom elevado permiten desplazamiento vertical. Las tablas tienen su propio desplazamiento horizontal. Paneles con foco contenido, Escape y devolución del foco; controles de 44 px, foco visible, respaldo sólido del vidrio y movimiento reducido.
+
+## Fórmulas y comparación
+
+Las tasas usan sumas de conteos, sin promediar tasas por fila:
+
+- Entrega: `max(sum(envíos) − sum(rebotes blandos) − sum(rebotes duros), 0) / sum(envíos)`.
+- Aperturas/envíos: `sum(aperturas únicas) / sum(envíos)`.
+- Clics/envíos: `sum(clics únicos) / sum(envíos)`.
+- Rebotes: `(sum(rebotes blandos) + sum(rebotes duros)) / sum(envíos)`.
+
+Los denominadores cero se muestran como `N/D`. Conteos se comparan mediante diferencia relativa; tasas, en puntos porcentuales. El período anterior es inmediatamente contiguo y tiene igual duración inclusiva. Sin registros anteriores o sin denominador válido se muestra `No comparable`. El histórico muestra `Sin período anterior comparable`.
+
+Los intervalos sin registros interrumpen el gráfico, en lugar de inventar ceros. La distancia horizontal representa tiempo real. La cobertura informa días con registros y no certifica integridad. Fechas desconocidas quedan fuera de los rangos fechados y se consultan desde Calidad, conservando los demás filtros.
+
+## Ejecutar con el snapshot incluido
+
+Requisitos: Python 3.12 y Node 22.12 o superior. Dependencias directas y transitivas están fijadas.
 
 ```bash
-python backend/scripts/sync_responsys.py \
-  --source xlsx \
-  --xlsx /ruta/Invetario_Responsys_2.0.xlsx \
-  --output frontend/public/data/dashboard.json
-
+pip install -r backend/requirements.lock
+python backend/scripts/build_overview.py
+python backend/scripts/validate_dataset.py
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
-## Conectar la Sheet viva
-
-1. Crear un Service Account en Google Cloud y habilitar Google Sheets API.
-2. Compartir `Invetario_Responsys_2.0` con el correo del Service Account como **lector**.
-3. En GitHub → Settings → Secrets and variables → Actions, crear:
-   - `GOOGLE_SERVICE_ACCOUNT_JSON`: JSON completo de credenciales del Service Account.
-4. En GitHub → Settings → Pages, seleccionar **GitHub Actions** como fuente.
-5. El workflow `.github/workflows/deploy-pages.yml` sincroniza la Sheet **cada hora** y vuelve a publicar el sitio.
-
-URL esperada del proyecto:
-
-`https://nr-etb.github.io/TABLEROS_RES/`
-
-## Docker local
-
-Copiar `.env.example` a `.env`, definir el archivo local de credenciales y ejecutar:
+No hace falta una cuenta de Google para visualizar el snapshot. Para reconstruir desde Excel:
 
 ```bash
-docker compose up
+python backend/scripts/sync_responsys.py --source xlsx --xlsx /ruta/Invetario_Responsys_2.0.xlsx --output frontend/public/data/dashboard.json
 ```
 
-El tablero queda disponible en `http://localhost:5173`.
+## Sincronización lectora de Google Sheets
 
-## Seguridad
+1. Habilitar Google Sheets API en Google Cloud y crear una cuenta de servicio.
+2. Compartir la hoja con su correo como **lector**.
+3. Configurar `GOOGLE_SERVICE_ACCOUNT_JSON` en GitHub Actions. Nunca incluir el archivo de credenciales en Git.
+4. Mantener `RESPONSYS_SPREADSHEET_ID` con el ID de la misma base. `.env.example`, Compose y Actions emplean ese nombre.
+5. Seleccionar GitHub Actions como fuente de Pages.
 
-- No subir `google-service-account.json` al repositorio.
-- Las credenciales solo viven en GitHub Secrets / secretos del entorno.
-- React nunca consulta Google Sheets directamente ni recibe credenciales.
+El workflow existente corre al publicar en `main`, manualmente y cada hora. Sin secreto publica el snapshot versionado; la pantalla identifica snapshot, corte y sincronización antigua. Con secreto sincroniza, genera ambos JSON, valida contratos y ejecuta pruebas antes de publicar. React nunca recibe credenciales ni consulta directamente Sheets.
 
-## Definiciones de indicadores
+Docker local: copiar `.env.example` a `.env`, configurar la ruta de credenciales y ejecutar `docker compose up`. El frontend abre en `http://localhost:5173` después de sincronizar el ETL.
 
-- **Entrega calculada:** `(Envios - Soft Bounces - Hard Bounces) / Envios`
-- **Unique opens / envíos:** `Unique Opens / Envios`
-- **Unique clicks / envíos:** `Unique Clicks / Envios`
-- **Rebote / envíos:** `(Soft Bounces + Hard Bounces) / Envios`
+## Verificación
 
-Estas definiciones están etiquetadas explícitamente para no confundirlas con los campos `Open Rate`, `Click-Through Rate` u otros rates preformateados del origen.
+```bash
+python -m unittest discover -s backend/tests -p 'test_*.py'
+python backend/scripts/validate_dataset.py
+cd frontend
+npm test
+npm run build
+```
+
+Para revisar la ruta real de Pages, compilar con `VITE_BASE_PATH=/TABLEROS_RES/`, volver a la raíz y ejecutar `python backend/scripts/preview_pages.py`. Abre `http://localhost:4180/TABLEROS_RES/`. Sus logs permiten confirmar que el inicio solicita solo el resumen. `--fault overview`, `detail`, `hash` o `worker` permite probar carga fallida, cortes diferentes y respaldo del worker.
+
+Las pruebas verifican paridad Python/TypeScript en los cuatro períodos del snapshot, conteos, límites inclusivos, períodos vacíos, fechas desconocidas, anomalías, agrupación exacta, paginación, CSV, enlaces y objetivo de consultas inferior a 150 ms. La validación rechaza contratos rotos, conteos inválidos, hashes incorrectos y resúmenes inconsistentes antes del despliegue.
+
+Resultados de aceptación y alcance: [docs/VALIDACION_1.0A.md](docs/VALIDACION_1.0A.md).

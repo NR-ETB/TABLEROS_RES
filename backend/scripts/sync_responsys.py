@@ -156,7 +156,9 @@ def choose_campaign_catalog(df: pd.DataFrame) -> tuple[dict[str, dict[str, Any]]
     if df.empty:
         return {}, set(), 0
     work = df.copy()
-    work["_key"] = work.get("Nombre", pd.Series(dtype=str)).map(normalize_key)
+    if 'Nombre' not in work.columns:
+        raise ValueError('Campañas Vigentes: missing Nombre column')
+    work["_key"] = work["Nombre"].map(normalize_key)
     work = work[work["_key"] != ""]
     duplicate_keys = int(work.groupby("_key").size().gt(1).sum())
 
@@ -164,8 +166,8 @@ def choose_campaign_catalog(df: pd.DataFrame) -> tuple[dict[str, dict[str, Any]]
     def state_rank(v: Any) -> int:
         return 1 if clean_text(v).upper() in {"ACTIVE", "A", "ACTIVO"} else 0
 
-    work["_active_rank"] = work.get("Estado", "").map(state_rank)
-    work["_id_rank"] = pd.to_numeric(work.get("ID", 0), errors="coerce").fillna(0)
+    work["_active_rank"] = work.get("Estado", pd.Series('', index=work.index)).map(state_rank)
+    work["_id_rank"] = pd.to_numeric(work.get("ID", pd.Series(0, index=work.index)), errors="coerce").fillna(0)
     work = work.sort_values(["_key", "_active_rank", "_id_rank"], ascending=[True, False, False])
     selected = work.drop_duplicates("_key", keep="first")
 
@@ -189,6 +191,8 @@ def folder_catalog(df: pd.DataFrame) -> tuple[set[str], dict[str, str]]:
     names: dict[str, str] = {}
     if df.empty:
         return keys, names
+    if 'Nombre' not in df.columns:
+        raise ValueError('Folders Vigentes: missing Nombre column')
     for _, row in df.iterrows():
         name = clean_text(row.get("Nombre"))
         key = normalize_key(name)
@@ -212,6 +216,9 @@ def make_dataset(frames: dict[str, pd.DataFrame], source_mode: str) -> dict[str,
     for sheet_name in STAT_SHEETS:
         sheet_year = int(re.search(r"(20\d{2})", sheet_name).group(1))
         df = frames[sheet_name].copy()
+        required = {'Campaña', 'Sent Date', 'Envios', 'Soft Bounces', 'Hard Bounces', 'Unique Opens', 'Unique Clicks'}
+        if not df.empty and not required <= set(df.columns):
+            raise ValueError(f'{sheet_name}: missing columns {sorted(required - set(df.columns))}')
         for col in STAT_COLUMNS:
             if col not in df.columns:
                 df[col] = None
@@ -219,7 +226,7 @@ def make_dataset(frames: dict[str, pd.DataFrame], source_mode: str) -> dict[str,
         for _, row in df.iterrows():
             campaign = clean_text(row.get("Campaña"))
             # Skip truly empty grid rows, but preserve records that at least identify a campaign/date/count.
-            if not campaign and not clean_text(row.get("Sent Date")) and number(row.get("Envios")) == 0:
+            if not campaign and not clean_text(row.get("Sent Date")) and not any(number(row.get(key)) for key in ['Envios', 'Soft Bounces', 'Hard Bounces', 'Unique Opens', 'Unique Clicks']):
                 continue
 
             date = parse_date(row.get("Sent Date"))
@@ -360,11 +367,17 @@ def make_dataset(frames: dict[str, pd.DataFrame], source_mode: str) -> dict[str,
 
 
 def write_dataset(dataset: dict[str, Any], output: Path) -> None:
+    from build_overview import write_overview
+    from validate_dataset import validate
+    validate(dataset)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
+    temporary = output.with_suffix('.json.tmp')
+    temporary.write_text(
         json.dumps(dataset, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+    write_overview(dataset, output.with_name('overview.json'))
+    temporary.replace(output)
     meta_output = output.with_name("meta.json")
     meta_output.write_text(
         json.dumps({"meta": dataset["meta"], "quality": dataset["quality"]}, ensure_ascii=False, indent=2),

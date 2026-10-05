@@ -35,3 +35,5 @@ Las incidencias no se borran ni corrigen automáticamente. Los controles globale
 ## Publicación
 
 Implementación publicada en la rama `main` de `NR-ETB/TABLEROS_RES` el 5 de octubre de 2026. El push se completó mediante Git local usando la cuenta `NR-ETB`; la limitación de escritura del conector no impidió la publicación. El workflow genera, valida y despliega la versión 1.0A automáticamente después de cada push. Google Sheets vivo sigue requiriendo configurar las credenciales lectoras; mientras tanto se publica el snapshot identificado en la interfaz.
+
+El push no confirma un despliegue completado. La ejecución `37364496982` aprobó el build, pero la asignación de runners de GitHub bloqueó su despliegue durante la incidencia de Actions del 5 de octubre. Pages se configuró con `build_type: workflow` para evitar el segundo proceso de publicación heredado. Se añadió una recuperación manual con macOS que reutiliza el paquete aprobado; su éxito debe comprobarse en Actions y en la URL pública.

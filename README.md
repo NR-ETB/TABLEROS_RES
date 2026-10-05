@@ -67,6 +67,8 @@ python backend/scripts/sync_responsys.py --source xlsx --xlsx /ruta/Invetario_Re
 
 El workflow existente corre al publicar en `main`, manualmente y cada hora. Sin secreto publica el snapshot versionado; la pantalla identifica snapshot, corte y sincronización antigua. Con secreto sincroniza, genera ambos JSON, valida contratos y ejecuta pruebas antes de publicar. React nunca recibe credenciales ni consulta directamente Sheets.
 
+Si un build ya aprobado queda bloqueado al asignar un runner Ubuntu, Actions ofrece **Recuperar publicación de Pages** (`recover-pages.yml`). Ejecutarlo desde `main` e indicar el ID de la ejecución original en `source_run_id`. Comprueba que el paquete procede del workflow habitual de `main`, tiene un build aprobado y no ha caducado; después lo publica desde `macos-15` sin regenerar datos. El paquete de origen se conserva durante un día. La recuperación comparte la exclusión mutua `pages` y cancela cualquier publicación anterior pendiente. Una incidencia general de Actions también puede bloquear esta alternativa.
+
 Docker local: copiar `.env.example` a `.env`, configurar la ruta de credenciales y ejecutar `docker compose up`. El frontend abre en `http://localhost:5173` después de sincronizar el ETL.
 
 ## Verificación

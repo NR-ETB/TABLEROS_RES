@@ -1,0 +1,80 @@
+name: Recuperar publicación de Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: ID de la ejecución de main cuyo build terminó correctamente
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    # macOS usa una infraestructura distinta de los runners Ubuntu de Azure.
+    # Recupera el paquete validado sin volver a ejecutar el ETL ni compilar.
+    runs-on: macos-15
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Verificar origen del paquete
+        uses: actions/github-script@v7
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        with:
+          script: |
+            const raw = process.env.SOURCE_RUN_ID;
+            if (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw))) {
+              throw new Error('El ID de ejecución debe ser un entero válido.');
+            }
+            const params = { ...context.repo, run_id: Number(raw) };
+            const { data: run } = await github.rest.actions.getWorkflowRun(params);
+            if (run.head_branch !== 'main' || run.path !== '.github/workflows/deploy-pages.yml') {
+              throw new Error('Solo se permiten paquetes del workflow habitual en main.');
+            }
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              ...params, filter: 'all', per_page: 100
+            });
+            if (!jobs.some(job => job.name === 'build' && job.conclusion === 'success')) {
+              throw new Error('La ejecución de origen no tiene un build aprobado.');
+            }
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...params, per_page: 100
+            });
+            const artifact = artifacts.find(item => item.name === 'github-pages' && !item.expired);
+            if (!artifact || artifact.workflow_run?.head_sha !== run.head_sha) {
+              throw new Error('El paquete de Pages no está disponible o no coincide con el commit.');
+            }
+            core.info(`Recuperando paquete del commit ${run.head_sha}, ejecución ${run.id}.`);
+
+      - name: Descargar paquete aprobado
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: pages-artifact
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Asociar paquete a esta ejecución
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: pages-artifact/artifact.tar
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Desplegar GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

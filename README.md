@@ -17,13 +17,15 @@ Tablero de rendimiento de campañas con identidad ETB, superficies liquid glass 
 
 ## Navegación
 
-**Resumen** abre todo el histórico y muestra cinco KPIs, evolución, top cinco, distribuciones e incidencias. **Campañas** agrupa por nombre original, ordena por envíos y permite consultar registros en páginas de 25 filas. **Calidad** separa incidencias de la selección y controles de la **Fuente completa**.
+**Resumen** abre todo el histórico y muestra cinco KPIs, evolución, top cinco, distribuciones e incidencias. El gráfico de actividad compara entrega, aperturas, clics y rebotes sobre envíos; las categorías se solapan y no representan un embudo. **Campañas** agrupa por nombre original y ordena inicialmente por envíos. **Calidad** separa incidencias de la selección y controles de la **Fuente completa**.
 
-Los períodos rápidos terminan en la última fecha disponible: histórico, 30 días, 90 días y año disponible. Más filtros permite fechas personalizadas, folder, programa, tipo, estado y calidad. Aplicar confirma; Cancelar descarta el borrador. La búsqueda espera 150 ms sin cambios y los resultados de consultas anteriores se ignoran. Los filtros activos se pueden quitar individualmente.
+Los períodos rápidos terminan en la última fecha disponible: histórico, 30 días, 90 días y año disponible. Más filtros agrupa período, campaña, categorías y controles en pestañas. Aplicar confirma; Cancelar descarta el borrador; Limpiar dentro del panel restablece el borrador y requiere Aplicar. La búsqueda principal espera 150 ms sin cambios y los resultados de consultas anteriores se ignoran. Los filtros activos se pueden editar o limpiar.
 
 Las URLs usan fragmentos (`#/campanas?period=last30&campaignExact=...`); funcionan al compartir, recargar y navegar atrás/adelante bajo `/TABLEROS_RES/`. Las exportaciones CSV incluyen todos los registros filtrados, independientemente de la página. Calidad exporta la incidencia seleccionada sin duplicar filas que presentan varias incidencias.
 
-El resumen inicial cabe en 1366×768 y 1920×1080 a zoom normal. Móvil y zoom elevado permiten desplazamiento vertical. Las tablas tienen su propio desplazamiento horizontal. Paneles con foco contenido, Escape y devolución del foco; controles de 44 px, foco visible, respaldo sólido del vidrio y movimiento reducido.
+El tablero ocupa el alto disponible (`100dvh`) sin desplazamiento vertical ni horizontal. En móvil o ventanas bajas, las cinco gráficas se consultan mediante pestañas y se conservan los cinco indicadores. Campañas, registros y ranking ajustan las filas por página al espacio disponible, con un máximo de 25; toda la selección sigue disponible mediante paginación y CSV. Las tablas compactas muestran campaña y métrica seleccionada; los detalles mantienen las demás cifras y campos. Las ventanas bajas trasladan los filtros al botón del encabezado. Paneles con foco contenido, Escape y devolución del foco, incluyendo detalles anidados.
+
+El botón de sol/luna cambia entre modo claro y oscuro ETB. La primera visita respeta la preferencia del sistema; la elección se guarda en este navegador. Ambos temas usan azul ETB, cian, superficies glass legibles, foco visible, respaldo sólido del vidrio y movimiento reducido.
 
 ## Fórmulas y comparación
 

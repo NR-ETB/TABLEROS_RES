@@ -196,6 +196,37 @@ test("Reject mixed hashes and corrupt record counts before combining overview/de
     /DATA_CHANGED/,
   );
 });
+test("Viewport pagination reaches every campaign and record without changing totals or CSV", () => {
+  const rows = Array.from({ length: 31 }, (_, index) => ({
+    ...row,
+    c: `Campaña ${index}`,
+    d: "2025-01-01",
+    cm: 0 as const,
+  }));
+  for (const pageSize of [1, 3, 7, 25]) {
+    const campaigns: string[] = [],
+      records: RecordRow[] = [];
+    for (let page = 1; page <= Math.ceil(rows.length / pageSize); page++) {
+      const answer = query(rows, {
+        ...base,
+        page,
+        recordPage: page,
+        pageSize,
+        recordPageSize: pageSize,
+      });
+      assert.equal(answer.summary.totals.sends, 310);
+      assert.equal(answer.campaignCount, 31);
+      assert.equal(answer.recordCount, 31);
+      campaigns.push(...answer.campaigns.map((item) => item.name));
+      records.push(...answer.records);
+    }
+    assert.equal(new Set(campaigns).size, 31);
+    assert.deepEqual(records, rows);
+    assert.equal(csv(rows, defaults).split("\r\n").length, 32);
+  }
+  assert.equal(query(rows, { ...base, pageSize: 0 }).campaigns.length, 1);
+  assert.equal(query(rows, { ...base, pageSize: 100 }).campaigns.length, 25);
+});
 test("Full 32k-row queries stay below the 150ms target after warmup", () => {
   query(dataset.records, base);
   const measurements = Array.from({ length: 5 }, () => {

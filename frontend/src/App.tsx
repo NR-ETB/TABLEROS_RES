@@ -14,6 +14,7 @@ import { integer, pct } from "./lib/numbers";
 import Overview from "./components/Overview";
 import Dialog from "./components/Dialog";
 import Records, { Pager } from "./components/Records";
+import { applyTheme, initialTheme, type Theme } from "./lib/theme";
 const CampaignsView = lazy(() => import("./views/CampaignsView"));
 const QualityView = lazy(() => import("./views/QualityView"));
 const periodLabels: Record<Period, string> = {
@@ -30,6 +31,8 @@ const initialQuery = {
   selected: null as string | null,
   recordPage: 1,
   issue: "all",
+  pageSize: 1,
+  recordPageSize: 1,
 };
 function Advanced({
   overview,
@@ -43,18 +46,43 @@ function Advanced({
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(filters);
+  const [tab, setTab] = useState("fechas"),
+    [invalid, setInvalid] = useState(false);
   const set = (key: keyof Filters, value: string) =>
     setDraft((current) => ({ ...current, [key]: value }));
   return (
     <Dialog title="Más filtros" onClose={onClose}>
       <form
+        noValidate
         onSubmit={(event) => {
           event.preventDefault();
+          if (!draft.from || !draft.to || draft.from > draft.to) {
+            setInvalid(true);
+            setTab("fechas");
+            return;
+          }
           onApply(draft);
           onClose();
         }}
       >
-        <div className="filter-grid">
+        <div className="panel-tabs" aria-label="Grupos de filtros">
+          {[
+            ["fechas", "Período"],
+            ["campana", "Campaña"],
+            ["categorias", "Categorías"],
+            ["control", "Control"],
+          ].map(([key, label]) => (
+            <button
+              type="button"
+              key={key}
+              aria-pressed={tab === key}
+              onClick={() => setTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="filter-grid" hidden={tab !== "fechas"}>
           <label>
             Período
             <select
@@ -103,10 +131,71 @@ function Advanced({
               }
             />
           </label>
+          <label>
+            Propósito
+            <select
+              value={draft.purpose}
+              onChange={(event) => set("purpose", event.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="Sin dato">Sin dato</option>
+              {overview.filters.purposes.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="filter-grid" hidden={tab !== "campana"}>
+          <label className="full-field">
+            Buscar campaña
+            <input
+              type="search"
+              value={draft.campaign}
+              placeholder="Nombre de campaña…"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  campaign: event.target.value,
+                  campaignExact: "",
+                })
+              }
+            />
+          </label>
+          {draft.campaignExact && (
+            <div className="exact-filter full-field">
+              <small>Campaña exacta</small>
+              <p>{draft.campaignExact}</p>
+              <button type="button" onClick={() => set("campaignExact", "")}>
+                Quitar selección exacta
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="filter-grid" hidden={tab !== "categorias"}>
           {(
             [
               ["folder", "folders", "Folder"],
               ["program", "programs", "Programa"],
+            ] as const
+          ).map(([key, options, label]) => (
+            <label key={key}>
+              {label}
+              <select
+                value={draft[key]}
+                onChange={(event) => set(key, event.target.value)}
+              >
+                <option value="">Todos</option>
+                <option value="Sin dato">Sin dato</option>
+                {overview.filters[options].map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+        <div className="filter-grid" hidden={tab !== "control"}>
+          {(
+            [
               ["type", "types", "Tipo"],
               ["status", "statuses", "Estado"],
             ] as const
@@ -142,11 +231,26 @@ function Advanced({
             </select>
           </label>
         </div>
-        <p>
-          Períodos rápidos terminan en {overview.meta.latestSentDate}. Fechas
-          desconocidas se consultan desde Calidad.
+        <p className="filter-note" role={invalid ? "alert" : undefined}>
+          {invalid ? (
+            "Selecciona un rango de fechas válido."
+          ) : (
+            <>
+              Períodos rápidos terminan en {overview.meta.latestSentDate}.
+              Fechas desconocidas se consultan desde Calidad.
+            </>
+          )}
         </p>
         <div className="dialog-actions">
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(defaultFilters(overview.meta));
+              setInvalid(false);
+            }}
+          >
+            Limpiar
+          </button>
           <button type="button" onClick={onClose}>
             Cancelar
           </button>
@@ -159,6 +263,7 @@ function Advanced({
   );
 }
 export default function App() {
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   const [overview, setOverview] = useState<OverviewData>(),
     [error, setError] = useState("");
   const [state, setState] = useState<{ view: View; filters: Filters }>(),
@@ -356,7 +461,7 @@ export default function App() {
   const synced = new Date(overview.meta.generatedAtUtc),
     old = Date.now() - synced.getTime() > 48 * 3600000;
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-view={state.view}>
       <header className="app-header">
         <a
           className="brand"
@@ -382,31 +487,88 @@ export default function App() {
             <button
               key={view}
               aria-current={state.view === view ? "page" : undefined}
+              aria-label={label}
               onClick={() => navigate(view, filters)}
             >
               {label}
+              {view === "calidad" && (
+                <small className="nav-count" aria-hidden="true">
+                  {integer(
+                    (summary || overview.summaries.all).quality.anomalyRows,
+                  )}
+                </small>
+              )}
             </button>
           ))}
         </nav>
-        <button className="source-button" onClick={() => setDialog("source")}>
-          <span>
-            {overview.meta.sourceMode === "google"
-              ? "Google Sheets"
-              : "Snapshot"}{" "}
-            · corte {overview.meta.latestSentDate}
-          </span>
-          <small>
-            {old ? "ⓘ Sincronización antigua" : "Ver fuente y sincronización"}{" "}
-            ↗
-          </small>
-        </button>
+        <div className="header-actions">
+          <button
+            className="source-button"
+            aria-label={`Fuente y corte de datos: ${overview.meta.sourceMode === "google" ? "Google Sheets" : "Snapshot"}, ${overview.meta.latestSentDate}`}
+            onClick={() => setDialog("source")}
+          >
+            <span>
+              {overview.meta.sourceMode === "google"
+                ? "Google Sheets"
+                : "Snapshot"}{" "}
+              · corte {overview.meta.latestSentDate}
+            </span>
+            <small>
+              {old ? "ⓘ Sincronización antigua" : "Ver fuente y sincronización"}{" "}
+              ↗
+            </small>
+          </button>
+          <button
+            className="theme-toggle"
+            aria-label={
+              theme === "light" ? "Activar modo oscuro" : "Activar modo claro"
+            }
+            aria-pressed={theme === "dark"}
+            onClick={() => {
+              const next = theme === "light" ? "dark" : "light";
+              applyTheme(next);
+              setTheme(next);
+            }}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              aria-hidden="true"
+            >
+              {theme === "light" ? (
+                <path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z" />
+              ) : (
+                <>
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" />
+                </>
+              )}
+            </svg>
+          </button>
+          <button
+            className="compact-filter-button"
+            aria-label="Abrir filtros"
+            onClick={() => setDialog("filters")}
+          >
+            ☷
+            {(activeFilters.length > 0 || filters.period === "custom") && (
+              <small aria-hidden="true">
+                {activeFilters.length + Number(filters.period === "custom")}
+              </small>
+            )}
+          </button>
+        </div>
       </header>
-      <main>
+      <main className="app-main">
         {state.view === "resumen" && (
           <h1 className="sr-only">Rendimiento de campañas</h1>
         )}
         <section className="glass toolbar" aria-label="Filtros principales">
-          <label>
+          <label className="period-field">
             Período
             <select
               value={filters.period}
@@ -426,7 +588,7 @@ export default function App() {
               ))}
             </select>
           </label>
-          <label>
+          <label className="purpose-field">
             Propósito
             <select
               value={filters.purpose}
@@ -454,29 +616,15 @@ export default function App() {
         </section>
         {(!!activeFilters.length || filters.period === "custom") && (
           <div className="filter-chips" aria-label="Filtros activos">
-            {filters.period === "custom" && (
-              <button
-                onClick={() => {
-                  const [from, to] = periodDates(overview.meta, "all");
-                  patch({ period: "all", from, to });
-                }}
-              >
-                {filters.from} al {filters.to} <span aria-hidden="true">×</span>
-              </button>
-            )}
-            {activeFilters.map((key) => (
-              <button
-                key={key}
-                onClick={() => patch({ [key]: "" })}
-                title={`Quitar ${key}: ${filters[key]}`}
-              >
-                {key === "quality"
-                  ? issueLabels[filters[key] as keyof typeof issueLabels] ||
-                    filters[key]
-                  : filters[key]}{" "}
-                <span aria-hidden="true">×</span>
-              </button>
-            ))}
+            <button
+              onClick={() => setDialog("filters")}
+              title={activeFilters
+                .map((key) => `${key}: ${filters[key]}`)
+                .join(" · ")}
+            >
+              {activeFilters.length + Number(filters.period === "custom")}{" "}
+              filtros activos · Editar
+            </button>
             <button
               onClick={() =>
                 navigate(state.view, defaultFilters(overview.meta))
@@ -641,10 +789,21 @@ export default function App() {
                   Rebotes <strong>{integer(result.detail.bounces)}</strong>
                 </span>
               </div>
-              <Records rows={result.records} />
+              <Records
+                rows={result.records}
+                pageSize={queryState.recordPageSize || 1}
+                onCapacity={(recordPageSize) =>
+                  setQueryState((current) => ({
+                    ...current,
+                    recordPageSize,
+                    recordPage: 1,
+                  }))
+                }
+              />
               <Pager
                 page={queryState.recordPage}
                 count={result.recordCount}
+                pageSize={queryState.recordPageSize}
                 onChange={(recordPage) =>
                   setQueryState((current) => ({ ...current, recordPage }))
                 }

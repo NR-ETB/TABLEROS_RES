@@ -1,6 +1,7 @@
 import type { Query, QueryResult } from "../types";
 import { integer, pct } from "../lib/numbers";
 import { Pager } from "../components/Records";
+import { usePageCapacity } from "../lib/usePageCapacity";
 export default function CampaignsView({
   result,
   request,
@@ -16,6 +17,12 @@ export default function CampaignsView({
   onExport: () => void;
   exporting: boolean;
 }) {
+  const table = usePageCapacity(
+    request.pageSize || 1,
+    request.selected === null
+      ? (pageSize) => onRequest({ pageSize, page: 1 })
+      : undefined,
+  );
   const sort = (key: Query["sort"]) =>
     onRequest({
       sort: key,
@@ -36,11 +43,7 @@ export default function CampaignsView({
           {exporting ? "Preparando…" : "Exportar registros CSV"}
         </button>
       </div>
-      <div
-        className="table-scroll"
-        tabIndex={0}
-        aria-label="Tabla de campañas; desplazamiento horizontal disponible"
-      >
+      <div className="table-scroll" ref={table} aria-label="Campañas paginadas">
         <table>
           <thead>
             <tr>
@@ -56,7 +59,29 @@ export default function CampaignsView({
                         : "none"
                     }
                   >
-                    <button onClick={() => sort(key)}>
+                    {key === "sends" && (
+                      <select
+                        className="compact-sort"
+                        aria-label="Ordenar campañas"
+                        value={request.sort}
+                        onChange={(event) =>
+                          onRequest({
+                            sort: event.target.value as Query["sort"],
+                            ascending: event.target.value === "name",
+                            page: 1,
+                          })
+                        }
+                      >
+                        <option value="sends">Envíos ↓</option>
+                        <option value="opens">Aperturas ↓</option>
+                        <option value="clicks">Clics ↓</option>
+                        <option value="name">Nombre ↑</option>
+                      </select>
+                    )}
+                    <button
+                      className={key === "sends" ? "full-sort" : ""}
+                      onClick={() => sort(key)}
+                    >
                       {
                         [
                           "Campaña",
@@ -81,7 +106,7 @@ export default function CampaignsView({
           <tbody>
             {result.campaigns.map((campaign) => (
               <tr key={campaign.name}>
-                <td className="campaign-cell">
+                <td className="campaign-cell" title={campaign.name}>
                   <button
                     className="text-button"
                     onClick={() => onSelect(campaign.name)}
@@ -89,10 +114,27 @@ export default function CampaignsView({
                     {campaign.name}
                   </button>
                 </td>
-                <td>{integer(campaign.totals.sends)}</td>
-                <td>{integer(campaign.totals.opens)}</td>
-                <td>{integer(campaign.totals.clicks)}</td>
-                <td>
+                <td data-label="Envíos">
+                  <span className="full-sort">
+                    {integer(campaign.totals.sends)}
+                  </span>
+                  <span className="compact-metric">
+                    {integer(
+                      campaign.totals[
+                        request.sort === "opens" || request.sort === "clicks"
+                          ? request.sort
+                          : "sends"
+                      ],
+                    )}
+                  </span>
+                </td>
+                <td className="secondary-column" data-label="Aperturas">
+                  {integer(campaign.totals.opens)}
+                </td>
+                <td className="secondary-column" data-label="Clics">
+                  {integer(campaign.totals.clicks)}
+                </td>
+                <td className="secondary-column" data-label="Entrega">
                   {campaign.totals.sends
                     ? pct(
                         (campaign.totals.delivered / campaign.totals.sends) *
@@ -100,7 +142,9 @@ export default function CampaignsView({
                       )
                     : "N/D"}
                 </td>
-                <td>{integer(campaign.totals.rows)}</td>
+                <td className="secondary-column">
+                  {integer(campaign.totals.rows)}
+                </td>
               </tr>
             ))}
             {!result.campaigns.length && (
@@ -114,6 +158,7 @@ export default function CampaignsView({
       <Pager
         page={request.page}
         count={result.campaignCount}
+        pageSize={request.pageSize}
         onChange={(page) => onRequest({ page })}
       />
     </section>

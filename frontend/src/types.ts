@@ -123,6 +123,8 @@ export type Query = {
   selected: string | null;
   recordPage: number;
   issue: string;
+  pageSize?: number;
+  recordPageSize?: number;
 };
 export type QueryResult = {
   summary: Summary;

@@ -18,10 +18,23 @@ export default function Dialog({
     const previous = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
     const shell = document.querySelector<HTMLElement>(".app-shell");
+    const wasInert = shell?.inert || false;
+    const parent = [
+      ...document.querySelectorAll<HTMLElement>('[role="dialog"]'),
+    ]
+      .filter((element) => element !== panel.current)
+      .at(-1);
+    const parentWasInert = parent?.inert || false;
+    if (parent) parent.inert = true;
     if (shell) shell.inert = true;
     document.body.style.overflow = "hidden";
     panel.current?.focus();
     const handle = (event: KeyboardEvent) => {
+      if (
+        [...document.querySelectorAll('[role="dialog"]')].at(-1) !==
+        panel.current
+      )
+        return;
       if (event.key === "Escape") {
         event.preventDefault();
         close.current();
@@ -58,7 +71,8 @@ export default function Dialog({
     return () => {
       document.removeEventListener("keydown", handle);
       document.body.style.overflow = overflow;
-      if (shell) shell.inert = false;
+      if (shell) shell.inert = wasInert;
+      if (parent) parent.inert = parentWasInert;
       previous?.focus();
     };
   }, []);
@@ -83,7 +97,7 @@ export default function Dialog({
             ×
           </button>
         </div>
-        {children}
+        <div className="dialog-content">{children}</div>
       </div>
     </div>,
     document.body,

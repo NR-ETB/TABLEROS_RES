@@ -169,7 +169,7 @@ export function summarize(records: RecordRow[], filters: Filters): Summary {
       buckets.set(label, (buckets.get(label) || 0) + row.e);
     }
   const trend: Summary["trend"] = [];
-  for (let cursor = utc(from); cursor <= utc(to); ) {
+  for (let cursor = utc(from); cursor <= utc(to);) {
     const label = iso(cursor).slice(0, monthly ? 7 : 10);
     trend.push({ label, value: buckets.get(label) ?? null });
     if (monthly) {
@@ -252,13 +252,20 @@ export function query(records: RecordRow[], request: Query): QueryResult {
             : !!flags(row)[request.issue as Issue],
         )
       : grouped.get(request.selected) || [];
+  const size = (value?: number) =>
+    Number.isFinite(value) ? Math.max(1, Math.min(25, Math.floor(value!))) : 25;
+  const pageSize = size(request.pageSize),
+    recordPageSize = size(request.recordPageSize);
   return {
     summary: summarize(records, request.filters),
-    campaigns: campaigns.slice((request.page - 1) * 25, request.page * 25),
+    campaigns: campaigns.slice(
+      (request.page - 1) * pageSize,
+      request.page * pageSize,
+    ),
     campaignCount: campaigns.length,
     records: detailRows.slice(
-      (request.recordPage - 1) * 25,
-      request.recordPage * 25,
+      (request.recordPage - 1) * recordPageSize,
+      request.recordPage * recordPageSize,
     ),
     recordCount: detailRows.length,
     detail: request.selected === null ? null : totals(detailRows),

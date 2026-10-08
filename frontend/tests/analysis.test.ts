@@ -15,6 +15,7 @@ import {
   validateDetail,
 } from "../src/lib/analysis.ts";
 import { makeHash, readHash } from "../src/lib/navigation.ts";
+import { report, rangeError } from "../src/lib/reports.ts";
 import type {
   DashboardData,
   OverviewData,
@@ -55,6 +56,111 @@ const row: RecordRow = {
   fm: 1,
   c: "Original",
 };
+test("Activity, list, origin year and send bounds filter before aggregating and survive shared links", () => {
+  const records = [
+    { ...row, d: "2026-09-01", sy: 2026, l: "Lista Principal", e: 100, uc: 5 },
+    { ...row, d: "2026-09-01", sy: 2025, l: "Lista Principal", e: 100, uc: 5 },
+    { ...row, d: "2026-09-01", sy: 2026, l: "Otra", e: 100, uc: 5 },
+    { ...row, d: "2026-09-01", sy: 2026, l: "Lista Principal", e: 99, uc: 5 },
+    { ...row, d: "2026-09-01", sy: 2026, l: "Lista Principal", e: 101, uc: 5 },
+    { ...row, d: "2026-09-01", sy: 2026, l: "Lista Principal", e: 100, uc: 0 },
+  ];
+  const filters = {
+    ...defaults,
+    list: "PRINCIPAL",
+    sourceYear: "2026",
+    minSends: "100",
+    maxSends: "100",
+    activity: "clicks",
+  };
+  assert.deepEqual(filterRows(records, filters), [records[0]]);
+  assert.equal(query(records, { ...base, filters }).summary.totals.sends, 100);
+  assert.deepEqual(
+    readHash(makeHash("resumen", filters), overview).filters,
+    filters,
+  );
+  assert.equal(
+    readHash("#/resumen?minSends=-1&maxSends=oops&activity=unknown", overview)
+      .filters.minSends,
+    "",
+  );
+  assert.equal(
+    filterRows([{ ...row, d: "2026-09-01", e: 0 }], {
+      ...defaults,
+      maxSends: "0",
+    }).length,
+    1,
+  );
+  assert.equal(
+    filterRows([{ ...row, d: "2026-09-01", uo: 0, uc: 0, hb: 0, sb: 0 }], {
+      ...defaults,
+      activity: "none",
+    }).length,
+    1,
+  );
+});
+test("Date reports use inclusive boundaries, preserve every row, exclude unknown dates and escape campaign names", () => {
+  const records = [
+    { ...row, d: "2026-09-01", c: "<script>alert(1)</script>", e: 100 },
+    { ...row, d: "2026-09-02", c: "=FORMULA", e: 200 },
+    { ...row, d: "2026-09-03", e: 500 },
+    { ...row, d: "", e: 900 },
+  ];
+  const filters = {
+    ...defaults,
+    period: "custom" as const,
+    from: "2026-09-01",
+    to: "2026-09-02",
+  };
+  for (const format of ["campaigns", "days", "records", "html"] as const) {
+    const result = report(records, overview, { filters, format });
+    assert.equal(result.rowCount, 2);
+    if (format === "html") {
+      assert.ok(result.content.includes("&lt;script&gt;"));
+      assert.ok(!result.content.includes("<script>"));
+      assert.ok(result.content.includes(overview.meta.dataHash));
+    } else assert.equal(result.content.split("\r\n").length, 3);
+    if (format === "campaigns") assert.ok(result.content.includes("'=FORMULA"));
+  }
+  assert.equal(
+    report(records, overview, {
+      filters: { ...filters, quality: "withoutDate" },
+      format: "quality",
+    }).rowCount,
+    0,
+  );
+  assert.ok(rangeError("2026-02-31", "2026-03-01"));
+  assert.ok(rangeError("2026-09-02", "2026-09-01"));
+  const empty = report(records, overview, {
+    filters: { ...filters, from: "2020-01-01", to: "2020-01-02" },
+    format: "html",
+  });
+  assert.equal(empty.rowCount, 0);
+  assert.ok(empty.content.includes("Sin registros"));
+});
+test("Reports agree with all snapshot metrics, campaign totals and quality union independently of pagination", () => {
+  const reportAll = report(dataset.records, overview, {
+    filters: defaults,
+    format: "campaigns",
+  });
+  assert.equal(
+    reportAll.rowCount,
+    filterRows(dataset.records, defaults).length,
+  );
+  const campaigns = reportAll.content.split("\r\n").slice(1);
+  const sends = campaigns.reduce(
+    (sum, line) => sum + Number(line.split('";"')[4]),
+    0,
+  );
+  assert.equal(sends, overview.summaries.all.totals.sends);
+  assert.equal(campaigns.length, query(dataset.records, base).campaignCount);
+  const quality = report(dataset.records, overview, {
+    filters: defaults,
+    format: "quality",
+  });
+  assert.equal(quality.rowCount, overview.summaries.all.quality.anomalyRows);
+  assert.equal(quality.content.split("\r\n").length, quality.rowCount + 1);
+});
 test("Python overview and TypeScript engine agree for all four presets on the full snapshot", () => {
   for (const period of ["all", "last30", "last90", "latestYear"] as Exclude<
     Period,

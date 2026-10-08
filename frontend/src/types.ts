@@ -65,7 +65,21 @@ export type Filters = {
   status: string;
   campaign: string;
   quality: string;
+  list: string;
+  sourceYear: string;
+  minSends: string;
+  maxSends: string;
+  activity: string;
 };
+
+export type ReportFormat =
+  "campaigns" | "days" | "records" | "quality" | "html";
+export type ReportRequest = {
+  filters: Filters;
+  format: ReportFormat;
+  issue?: string;
+};
+export type ReportResult = { content: string; rowCount: number };
 
 export type Period = "all" | "last30" | "last90" | "latestYear" | "custom";
 export type View = "resumen" | "campanas" | "calidad";

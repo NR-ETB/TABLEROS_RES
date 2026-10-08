@@ -1,10 +1,13 @@
 import { csv, query, validateDetail } from "./analysis.ts";
+import { report } from "./reports.ts";
 import type {
   DashboardData,
   Filters,
   OverviewData,
   Query,
   QueryResult,
+  ReportRequest,
+  ReportResult,
 } from "../types.ts";
 let worker: Worker | undefined,
   failed = false,
@@ -19,6 +22,7 @@ async function fallback(
   request?: Query,
   filters?: Filters,
   issue?: string,
+  reportRequest?: ReportRequest,
 ) {
   detail ??= fetch(import.meta.env.BASE_URL + "data/dashboard.json")
     .then((response) => {
@@ -31,15 +35,18 @@ async function fallback(
     });
   const data = await detail;
   validateDetail(data, overview);
-  return request
-    ? query(data.records, request)
-    : csv(data.records, filters!, issue);
+  return reportRequest
+    ? report(data.records, overview, reportRequest)
+    : request
+      ? query(data.records, request)
+      : csv(data.records, filters!, issue);
 }
 function run(
   overview: OverviewData,
   request?: Query,
   filters?: Filters,
   issue?: string,
+  reportRequest?: ReportRequest,
 ): Promise<unknown> {
   if (!failed && !worker)
     try {
@@ -64,14 +71,22 @@ function run(
     } catch {
       failed = true;
     }
-  if (!worker) return fallback(overview, request, filters, issue);
+  if (!worker)
+    return fallback(overview, request, filters, issue, reportRequest);
   const id = ++nextId;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    worker!.postMessage({ id, overview, query: request, filters, issue });
+    worker!.postMessage({
+      id,
+      overview,
+      query: request,
+      filters,
+      issue,
+      report: reportRequest,
+    });
   }).catch((error) => {
     if (error.message === "WORKER_UNAVAILABLE")
-      return fallback(overview, request, filters, issue);
+      return fallback(overview, request, filters, issue, reportRequest);
     throw error;
   });
 }
@@ -82,3 +97,11 @@ export const exportCsv = (
   filters: Filters,
   issue?: string,
 ) => run(overview, undefined, filters, issue) as Promise<string>;
+export const exportReport = (overview: OverviewData, request: ReportRequest) =>
+  run(
+    overview,
+    undefined,
+    undefined,
+    undefined,
+    request,
+  ) as Promise<ReportResult>;

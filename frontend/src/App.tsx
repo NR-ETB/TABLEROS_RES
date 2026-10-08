@@ -7,7 +7,13 @@ import type {
   QueryResult,
   View,
 } from "./types";
-import { defaultFilters, issueLabels, periodDates } from "./lib/analysis";
+import {
+  defaultFilters,
+  issueLabels,
+  periodDates,
+  filterLabels,
+  filterValue,
+} from "./lib/analysis";
 import { makeHash, readHash } from "./lib/navigation";
 import { exportCsv, runQuery } from "./lib/client";
 import { integer, pct } from "./lib/numbers";
@@ -15,6 +21,9 @@ import Overview from "./components/Overview";
 import Dialog from "./components/Dialog";
 import Records, { Pager } from "./components/Records";
 import { applyTheme, initialTheme, type Theme } from "./lib/theme";
+import { rangeError } from "./lib/reports";
+import { saveDownload } from "./lib/download";
+const Reports = lazy(() => import("./components/Reports"));
 const CampaignsView = lazy(() => import("./views/CampaignsView"));
 const QualityView = lazy(() => import("./views/QualityView"));
 const periodLabels: Record<Period, string> = {
@@ -46,43 +55,81 @@ function Advanced({
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(filters);
+  const [fieldPage, setFieldPage] = useState(1);
   const [tab, setTab] = useState("fechas"),
-    [invalid, setInvalid] = useState(false);
+    [invalid, setInvalid] = useState("");
   const set = (key: keyof Filters, value: string) =>
     setDraft((current) => ({ ...current, [key]: value }));
   return (
-    <Dialog title="Más filtros" onClose={onClose}>
+    <Dialog title="Más filtros" onClose={onClose} className="filter-dialog">
       <form
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          if (!draft.from || !draft.to || draft.from > draft.to) {
-            setInvalid(true);
+          const dateError = rangeError(draft.from, draft.to);
+          if (dateError) {
+            setInvalid(dateError);
             setTab("fechas");
+            setFieldPage(1);
+            return;
+          }
+          if (
+            draft.sourceYear !== "" &&
+            (!/^\d+$/.test(draft.sourceYear) ||
+              !Number.isSafeInteger(Number(draft.sourceYear)))
+          ) {
+            setInvalid("El año de origen debe ser un número entero positivo.");
+            setTab("categorias");
+            setFieldPage(1);
+            return;
+          }
+          if (
+            [draft.minSends, draft.maxSends].some(
+              (value) =>
+                value !== "" &&
+                (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))),
+            ) ||
+            (draft.minSends !== "" &&
+              draft.maxSends !== "" &&
+              Number(draft.minSends) > Number(draft.maxSends))
+          ) {
+            setInvalid(
+              "Usa números enteros positivos o cero. El mínimo no debe superar el máximo.",
+            );
+            setTab("actividad");
+            setFieldPage(1);
             return;
           }
           onApply(draft);
           onClose();
         }}
       >
-        <div className="panel-tabs" aria-label="Grupos de filtros">
+        <div className="panel-tabs filter-tabs" aria-label="Grupos de filtros">
           {[
             ["fechas", "Período"],
             ["campana", "Campaña"],
             ["categorias", "Categorías"],
+            ["actividad", "Actividad"],
             ["control", "Control"],
           ].map(([key, label]) => (
             <button
               type="button"
               key={key}
               aria-pressed={tab === key}
-              onClick={() => setTab(key)}
+              onClick={() => {
+                setTab(key);
+                setFieldPage(1);
+              }}
             >
               {label}
             </button>
           ))}
         </div>
-        <div className="filter-grid" hidden={tab !== "fechas"}>
+        <div
+          className="filter-grid"
+          data-page={fieldPage}
+          hidden={tab !== "fechas"}
+        >
           <label>
             Período
             <select
@@ -107,7 +154,17 @@ function Advanced({
             Desde
             <input
               type="date"
+              onInput={(event) => {
+                const value = event.currentTarget.value;
+                const key = event.currentTarget.name;
+                setDraft((current) => ({
+                  ...current,
+                  [key]: value,
+                  period: "custom",
+                }));
+              }}
               required
+              name="from"
               value={draft.from}
               max={draft.to}
               onChange={(event) =>
@@ -123,7 +180,17 @@ function Advanced({
             Hasta
             <input
               type="date"
+              onInput={(event) => {
+                const value = event.currentTarget.value;
+                const key = event.currentTarget.name;
+                setDraft((current) => ({
+                  ...current,
+                  [key]: value,
+                  period: "custom",
+                }));
+              }}
               required
+              name="to"
               value={draft.to}
               min={draft.from}
               onChange={(event) =>
@@ -171,7 +238,31 @@ function Advanced({
             </div>
           )}
         </div>
-        <div className="filter-grid" hidden={tab !== "categorias"}>
+        <div
+          className="filter-grid"
+          data-page={fieldPage}
+          hidden={tab !== "categorias"}
+        >
+          <label>
+            Lista contiene
+            <input
+              type="search"
+              placeholder="Nombre o parte de la lista"
+              value={draft.list}
+              onChange={(e) => set("list", e.target.value)}
+            />
+          </label>
+          <label>
+            Año de origen
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="Todos"
+              value={draft.sourceYear}
+              onChange={(e) => set("sourceYear", e.target.value)}
+            />
+          </label>
           {(
             [
               ["folder", "folders", "Folder"],
@@ -193,7 +284,52 @@ function Advanced({
             </label>
           ))}
         </div>
-        <div className="filter-grid" hidden={tab !== "control"}>
+        <div
+          className="filter-grid"
+          data-page={fieldPage}
+          hidden={tab !== "actividad"}
+        >
+          <label>
+            Envíos mínimos por registro
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="Sin mínimo"
+              value={draft.minSends}
+              onChange={(e) => set("minSends", e.target.value)}
+            />
+          </label>
+          <label>
+            Envíos máximos por registro
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="Sin máximo"
+              value={draft.maxSends}
+              onChange={(e) => set("maxSends", e.target.value)}
+            />
+          </label>
+          <label className="full-field">
+            Actividad del registro
+            <select
+              value={draft.activity}
+              onChange={(e) => set("activity", e.target.value)}
+            >
+              <option value="">Toda la actividad</option>
+              <option value="opens">Con aperturas</option>
+              <option value="clicks">Con clics</option>
+              <option value="bounces">Con rebotes</option>
+              <option value="none">Sin aperturas, clics ni rebotes</option>
+            </select>
+          </label>
+        </div>
+        <div
+          className="filter-grid"
+          data-page={fieldPage}
+          hidden={tab !== "control"}
+        >
           {(
             [
               ["type", "types", "Tipo"],
@@ -231,9 +367,20 @@ function Advanced({
             </select>
           </label>
         </div>
+        {tab !== "campana" && (
+          <div className="filter-page">
+            <small>Campos {fieldPage} / 2</small>
+            <button
+              type="button"
+              onClick={() => setFieldPage(fieldPage === 1 ? 2 : 1)}
+            >
+              {fieldPage === 1 ? "Más campos" : "Campos anteriores"}
+            </button>
+          </div>
+        )}
         <p className="filter-note" role={invalid ? "alert" : undefined}>
           {invalid ? (
-            "Selecciona un rango de fechas válido."
+            invalid
           ) : (
             <>
               Períodos rápidos terminan en {overview.meta.latestSentDate}.
@@ -246,7 +393,7 @@ function Advanced({
             type="button"
             onClick={() => {
               setDraft(defaultFilters(overview.meta));
-              setInvalid(false);
+              setInvalid("");
             }}
           >
             Limpiar
@@ -277,7 +424,9 @@ export default function App() {
       data: QueryResult;
     }>(),
     [loading, setLoading] = useState(false);
-  const [dialog, setDialog] = useState<"filters" | "source" | null>(null),
+  const [dialog, setDialog] = useState<"filters" | "source" | "reports" | null>(
+      null,
+    ),
     [exporting, setExporting] = useState(false);
   useEffect(() => {
     let active = true;
@@ -357,6 +506,11 @@ export default function App() {
       filters.campaign,
       filters.campaignExact,
       filters.quality,
+      filters.list,
+      filters.sourceYear,
+      filters.minSends,
+      filters.maxSends,
+      filters.activity,
     ].some(Boolean);
   const request = filters ? { ...queryState, filters } : undefined;
   const requestKey = JSON.stringify(request);
@@ -406,16 +560,11 @@ export default function App() {
     setExporting(true);
     try {
       const content = await exportCsv(overview, filters, issue);
-      const url = URL.createObjectURL(
-        new Blob([content], { type: "text/csv;charset=utf-8" }),
+      saveDownload(
+        content,
+        `responsys-1.0A-${state!.view}-${filters.from}-${filters.to}.csv`,
+        "text/csv;charset=utf-8",
       );
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `responsys-1.0A-${state!.view}-${filters.from}-${filters.to}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -456,6 +605,11 @@ export default function App() {
       "campaign",
       "campaignExact",
       "quality",
+      "list",
+      "sourceYear",
+      "minSends",
+      "maxSends",
+      "activity",
     ] as const
   ).filter((key) => filters[key]);
   const synced = new Date(overview.meta.generatedAtUtc),
@@ -502,6 +656,24 @@ export default function App() {
           ))}
         </nav>
         <div className="header-actions">
+          <button
+            className="reports-button"
+            onClick={() => setDialog("reports")}
+            aria-label="Reportes por fecha"
+          >
+            <svg
+              aria-hidden="true"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+            >
+              <path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4" />
+            </svg>
+            <span>Reportes</span>
+          </button>
           <button
             className="source-button"
             aria-label={`Fuente y corte de datos: ${overview.meta.sourceMode === "google" ? "Google Sheets" : "Snapshot"}, ${overview.meta.latestSentDate}`}
@@ -616,10 +788,27 @@ export default function App() {
         </section>
         {(!!activeFilters.length || filters.period === "custom") && (
           <div className="filter-chips" aria-label="Filtros activos">
+            {activeFilters.slice(0, 2).map((key) => (
+              <button
+                className="filter-chip"
+                key={key}
+                onClick={() => patch({ [key]: "" })}
+                title={`${filterLabels[key]}: ${filterValue(key, filters[key])}`}
+                aria-label={`Quitar filtro ${filterLabels[key]}: ${filterValue(key, filters[key])}`}
+              >
+                <span>
+                  {filterLabels[key]}: {filterValue(key, filters[key])}
+                </span>
+                <span aria-hidden="true">×</span>
+              </button>
+            ))}
             <button
               onClick={() => setDialog("filters")}
               title={activeFilters
-                .map((key) => `${key}: ${filters[key]}`)
+                .map(
+                  (key) =>
+                    `${filterLabels[key]}: ${filterValue(key, filters[key])}`,
+                )
                 .join(" · ")}
             >
               {activeFilters.length + Number(filters.period === "custom")}{" "}
@@ -714,6 +903,22 @@ export default function App() {
           onClose={() => setDialog(null)}
         />
       )}{" "}
+      {dialog === "reports" && (
+        <Suspense
+          fallback={
+            <Dialog title="Reportes por fecha" onClose={() => setDialog(null)}>
+              <p role="status">Abriendo reportes…</p>
+            </Dialog>
+          }
+        >
+          <Reports
+            overview={overview}
+            filters={filters}
+            issue={state.view === "calidad" ? queryState.issue : undefined}
+            onClose={() => setDialog(null)}
+          />
+        </Suspense>
+      )}
       {dialog === "source" && (
         <Dialog title="Fuente y corte de datos" onClose={() => setDialog(null)}>
           <dl className="source-info">

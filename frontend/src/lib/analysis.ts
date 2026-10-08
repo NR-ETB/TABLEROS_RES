@@ -15,6 +15,21 @@ import type {
 const DAY = 86400000;
 const utc = (date: string) => Date.parse(date + "T00:00:00Z");
 const iso = (time: number) => new Date(time).toISOString().slice(0, 10);
+export const filterLabels: Record<string, string> = {
+  purpose: "Propósito",
+  folder: "Folder",
+  program: "Programa",
+  type: "Tipo",
+  status: "Estado",
+  campaign: "Campaña contiene",
+  campaignExact: "Campaña exacta",
+  quality: "Calidad",
+  list: "Lista contiene",
+  sourceYear: "Año de origen",
+  minSends: "Envíos mínimos",
+  maxSends: "Envíos máximos",
+  activity: "Actividad",
+};
 export const issueLabels: Record<Issue, string> = {
   missingCampaign: "Campaña ausente",
   unmatchedCampaign: "Cruce de campaña fallido",
@@ -24,6 +39,31 @@ export const issueLabels: Record<Issue, string> = {
   dateMismatch: "Año de origen discrepante",
   withoutDate: "Fecha desconocida",
 };
+export function filterValue(key: string, value: string): string {
+  if (key === "activity")
+    return (
+      (
+        {
+          opens: "Con aperturas",
+          clicks: "Con clics",
+          bounces: "Con rebotes",
+          none: "Sin actividad",
+        } as Record<string, string>
+      )[value] || value
+    );
+  if (key === "quality")
+    return (
+      issueLabels[value as Issue] ||
+      (
+        {
+          fullMatch: "Cruces completos",
+          anomalyRows: "Con incidencias",
+        } as Record<string, string>
+      )[value] ||
+      value
+    );
+  return value;
+}
 export function periodDates(
   meta: DashboardData["meta"],
   period: Period,
@@ -53,6 +93,11 @@ export function defaultFilters(meta: DashboardData["meta"]): Filters {
     campaign: "",
     campaignExact: "",
     quality: "",
+    list: "",
+    sourceYear: "",
+    minSends: "",
+    maxSends: "",
+    activity: "",
   };
 }
 export function flags(row: RecordRow): Record<Issue, boolean> {
@@ -88,6 +133,27 @@ export function filterRows(
       return false;
     if (filters.type && (row.t || "Sin dato") !== filters.type) return false;
     if (filters.status && (row.s || "Sin dato") !== filters.status)
+      return false;
+    if (
+      filters.list &&
+      !row.l
+        .toLocaleLowerCase("es")
+        .includes(filters.list.trim().toLocaleLowerCase("es"))
+    )
+      return false;
+    if (filters.sourceYear && row.sy !== Number(filters.sourceYear))
+      return false;
+    if (filters.minSends !== "" && row.e < Number(filters.minSends))
+      return false;
+    if (filters.maxSends !== "" && row.e > Number(filters.maxSends))
+      return false;
+    if (filters.activity === "opens" && row.uo <= 0) return false;
+    if (filters.activity === "clicks" && row.uc <= 0) return false;
+    if (filters.activity === "bounces" && row.sb + row.hb <= 0) return false;
+    if (
+      filters.activity === "none" &&
+      (row.uo > 0 || row.uc > 0 || row.sb + row.hb > 0)
+    )
       return false;
     if (
       filters.campaignExact &&

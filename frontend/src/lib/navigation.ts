@@ -26,8 +26,30 @@ export function readHash(
     "campaign",
     "campaignExact",
     "quality",
+    "list",
+    "sourceYear",
+    "minSends",
+    "maxSends",
+    "activity",
   ] as const)
     filters[key] = params.get(key) || "";
+  for (const key of ["minSends", "maxSends", "sourceYear"] as const)
+    if (
+      filters[key] &&
+      (!/^\d+$/.test(filters[key]) ||
+        !Number.isSafeInteger(Number(filters[key])))
+    )
+      filters[key] = "";
+  if (
+    filters.minSends &&
+    filters.maxSends &&
+    Number(filters.minSends) > Number(filters.maxSends)
+  ) {
+    filters.minSends = "";
+    filters.maxSends = "";
+  }
+  if (!["", "opens", "clicks", "bounces", "none"].includes(filters.activity))
+    filters.activity = "";
   if (filters.period === "custom") {
     const valid = (value: string | null) =>
       !!value &&

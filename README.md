@@ -1,6 +1,6 @@
 # ETB · Responsys 1.0A
 
-Tablero de rendimiento de campañas con identidad ETB, superficies liquid glass y publicación estática en [GitHub Pages](https://nr-etb.github.io/TABLEROS_RES/).
+Tablero de rendimiento de campañas con identidad ETB, indicadores en una franja continua y vidrio discreto en controles y paneles flotantes. Publicación estática en [GitHub Pages](https://nr-etb.github.io/TABLEROS_RES/).
 
 ## Arquitectura y datos
 
@@ -19,13 +19,15 @@ Tablero de rendimiento de campañas con identidad ETB, superficies liquid glass 
 
 **Resumen** abre todo el histórico y muestra cinco KPIs, evolución, top cinco, distribuciones e incidencias. El gráfico de actividad compara entrega, aperturas, clics y rebotes sobre envíos; las categorías se solapan y no representan un embudo. **Campañas** agrupa por nombre original y ordena inicialmente por envíos. **Calidad** separa incidencias de la selección y controles de la **Fuente completa**.
 
-Los períodos rápidos terminan en la última fecha disponible: histórico, 30 días, 90 días y año disponible. Más filtros agrupa período, campaña, categorías y controles en pestañas. Aplicar confirma; Cancelar descarta el borrador; Limpiar dentro del panel restablece el borrador y requiere Aplicar. La búsqueda principal espera 150 ms sin cambios y los resultados de consultas anteriores se ignoran. Los filtros activos se pueden editar o limpiar.
+Los períodos rápidos terminan en la última fecha disponible: histórico, 30 días, 90 días y año disponible. Más filtros agrupa período, campaña, categorías, actividad y controles en pestañas. Se puede filtrar por texto de lista, año de origen, envíos mínimos/máximos por registro y presencia de aperturas, clics o rebotes. Todos los filtros se aplican antes de sumar. Aplicar confirma; Cancelar descarta el borrador; Limpiar dentro del panel restablece el borrador y requiere Aplicar. La búsqueda principal espera 150 ms sin cambios y los resultados de consultas anteriores se ignoran. Los filtros activos se pueden editar, quitar individualmente desde la franja o limpiar.
+
+**Reportes por fecha** está disponible en las tres vistas. Elegir fechas inclusivas y conservar o descartar filtros actuales, sin cambiar la selección del tablero. Descargas: campañas, evolución diaria, registros e incidencias en CSV UTF-8 con punto y coma; informe HTML con indicadores, todas las campañas, filtros y procedencia. Abrir el HTML permite imprimirlo o guardarlo como PDF desde el navegador; no se genera PDF directamente. Los reportes fechados excluyen fechas desconocidas. La exportación directa de Calidad mantiene la posibilidad de descargar registros sin fecha. Las descargas no dependen de la página de tabla visible.
 
 Las URLs usan fragmentos (`#/campanas?period=last30&campaignExact=...`); funcionan al compartir, recargar y navegar atrás/adelante bajo `/TABLEROS_RES/`. Las exportaciones CSV incluyen todos los registros filtrados, independientemente de la página. Calidad exporta la incidencia seleccionada sin duplicar filas que presentan varias incidencias.
 
 El tablero ocupa el alto disponible (`100dvh`) sin desplazamiento vertical ni horizontal. En móvil o ventanas bajas, las cinco gráficas se consultan mediante pestañas y se conservan los cinco indicadores. Campañas, registros y ranking ajustan las filas por página al espacio disponible, con un máximo de 25; toda la selección sigue disponible mediante paginación y CSV. Las tablas compactas muestran campaña y métrica seleccionada; los detalles mantienen las demás cifras y campos. Las ventanas bajas trasladan los filtros al botón del encabezado. Paneles con foco contenido, Escape y devolución del foco, incluyendo detalles anidados.
 
-El botón de sol/luna cambia entre modo claro y oscuro ETB. La primera visita respeta la preferencia del sistema; la elección se guarda en este navegador. Ambos temas usan azul ETB, cian, superficies glass legibles, foco visible, respaldo sólido del vidrio y movimiento reducido.
+El botón de sol/luna cambia entre modo claro y oscuro ETB. La primera visita respeta la preferencia del sistema; la elección se guarda en este navegador. Ambos temas usan azul ETB, cian, superficies tranquilas, foco visible, respaldo sólido del vidrio y movimiento reducido. La cifra de envíos lidera la franja de indicadores; las tasas acompañan. Los paneles de filtros y reportes conservan su altura al cambiar de grupo o paso. En pantallas estrechas de poca altura, Más campos permite consultar todos los campos sin desplazamiento.
 
 ## Fórmulas y comparación
 

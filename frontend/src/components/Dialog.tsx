@@ -5,11 +5,13 @@ export default function Dialog({
   onClose,
   children,
   wide = false,
+  className = "",
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  className?: string;
 }) {
   const panel = useRef<HTMLDivElement>(null),
     close = useRef(onClose);
@@ -84,7 +86,7 @@ export default function Dialog({
       }}
     >
       <div
-        className={`glass dialog ${wide ? "wide" : ""}`}
+        className={`glass dialog ${wide ? "wide" : ""} ${className}`}
         ref={panel}
         tabIndex={-1}
         role="dialog"

@@ -1,5 +1,12 @@
 import { csv, query, validateDetail } from "./analysis.ts";
-import type { DashboardData, Filters, OverviewData, Query } from "../types.ts";
+import type {
+  DashboardData,
+  Filters,
+  OverviewData,
+  Query,
+  ReportRequest,
+} from "../types.ts";
+import { report } from "./reports.ts";
 let detail: Promise<DashboardData> | undefined;
 onmessage = async ({
   data,
@@ -9,6 +16,7 @@ onmessage = async ({
   query?: Query;
   filters?: Filters;
   issue?: string;
+  report?: ReportRequest;
 }>) => {
   try {
     detail ??= fetch(import.meta.env.BASE_URL + "data/dashboard.json").then(
@@ -21,9 +29,11 @@ onmessage = async ({
     validateDetail(dataset, data.overview);
     postMessage({
       id: data.id,
-      result: data.query
-        ? query(dataset.records, data.query)
-        : csv(dataset.records, data.filters!, data.issue),
+      result: data.report
+        ? report(dataset.records, data.overview, data.report)
+        : data.query
+          ? query(dataset.records, data.query)
+          : csv(dataset.records, data.filters!, data.issue),
     });
   } catch (error) {
     detail = undefined;

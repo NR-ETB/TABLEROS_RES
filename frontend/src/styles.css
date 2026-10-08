@@ -1978,6 +1978,9 @@ h2 {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  button:active:not(:disabled) {
+    transform: none;
+  }
   *,
   *::before,
   *::after {

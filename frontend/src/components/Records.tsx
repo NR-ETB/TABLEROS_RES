@@ -4,6 +4,7 @@ import { flags, issueLabels } from "../lib/analysis";
 import { integer } from "../lib/numbers";
 import { usePageCapacity } from "../lib/usePageCapacity";
 import Dialog from "./Dialog";
+import FieldPages from "./FieldPages";
 
 export function Pager({
   page,
@@ -117,8 +118,18 @@ export default function Records({
         </table>
       </div>
       {selected && (
-        <Dialog title="Detalle del registro" onClose={() => setSelected(null)}>
+        <Dialog
+          title="Detalle del registro"
+          className="catalog-dialog"
+          onClose={() => setSelected(null)}
+        >
           <div className="panel-tabs" aria-label="Información del registro">
+            <button
+              aria-pressed={tab === "fuente"}
+              onClick={() => setTab("fuente")}
+            >
+              Fuente
+            </button>
             <button
               aria-pressed={tab === "datos"}
               onClick={() => setTab("datos")}
@@ -138,24 +149,31 @@ export default function Records({
               Calidad
             </button>
           </div>
-          <dl className="record-info" hidden={tab !== "datos"}>
-            {[
-              ["Campaña", selected.c],
-              ["Fecha", selected.d],
-              ["Folder", selected.f],
-              ["Propósito", selected.p],
-              ["Programa", selected.g],
-              [
-                "Tipo / estado",
-                `${selected.t || "Sin dato"} · ${selected.s || "Sin dato"}`,
-              ],
-            ].map(([key, value]) => (
-              <div key={key}>
-                <dt>{key}</dt>
-                <dd>{value || "Sin dato"}</dd>
-              </div>
-            ))}
-          </dl>
+          {tab === "fuente" && (
+            <FieldPages
+              fields={
+                selected.source || {
+                  "Datos originales":
+                    "Este snapshot no incluye los campos originales. Actualiza la fuente para consultarlos.",
+                }
+              }
+            />
+          )}
+          {tab === "datos" && (
+            <FieldPages
+              fields={{
+                Campaña: selected.c,
+                Fecha: selected.d,
+                Folder: selected.f,
+                Propósito: selected.p,
+                Programa: selected.g,
+                Tipo: selected.t,
+                Estado: selected.s,
+                Lista: selected.l,
+                "Año de origen": selected.sy,
+              }}
+            />
+          )}
           <dl className="record-info" hidden={tab !== "metricas"}>
             {[
               ["Envíos", selected.e],

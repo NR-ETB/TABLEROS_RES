@@ -353,3 +353,163 @@ test("Full 32k-row queries stay below the 150ms target after warmup", () => {
   );
   assert.ok(measurements[2] < 150, `Query median ${measurements[2]}ms`);
 });
+
+test("Full catalog includes duplicates and campaigns without statistics; searches tolerate accents and word order", () => {
+  const catalog = [
+    {
+      row: 2,
+      fields: {
+        ID: 7,
+        Nombre: "Campaña Ágil",
+        Asunto: "Factura nueva ETB",
+        Nombre_Envio: "Comunicaciones",
+        Correo_Envio: "marca@etb.com",
+        Estado: "ACTIVE",
+        Lista: "Lista Única",
+      },
+    },
+    {
+      row: 3,
+      fields: {
+        ID: 8,
+        Nombre: "Campaña Ágil",
+        Asunto: "Versión anterior",
+        Estado: "CLOSED",
+      },
+    },
+    {
+      row: 4,
+      fields: {
+        ID: 9,
+        Nombre: "Solo catálogo",
+        Asunto: "Sin actividad",
+        Estado: "ACTIVE",
+      },
+    },
+  ];
+  const records = [
+    { ...row, c: "Campaña Ágil", d: defaults.from, l: "Lista Única" },
+  ];
+  const all = query(records, { ...base, catalogMode: true }, catalog);
+  assert.equal(all.inventoryCount, 3);
+  assert.equal(all.campaignCount, 1);
+  assert.equal(all.summary.totals.sends, row.e);
+  assert.equal(
+    query(
+      records,
+      {
+        ...base,
+        catalogMode: true,
+        filters: { ...defaults, catalogPresence: "without" },
+      },
+      catalog,
+    ).inventoryCount,
+    1,
+  );
+  assert.equal(
+    query(
+      records,
+      { ...base, filters: { ...defaults, campaign: "agil campana" } },
+      catalog,
+    ).campaignCount,
+    1,
+  );
+  assert.equal(
+    query(
+      records,
+      {
+        ...base,
+        filters: { ...defaults, campaign: "7 factura", searchIn: "all" },
+      },
+      catalog,
+    ).campaignCount,
+    1,
+  );
+  assert.equal(
+    query(
+      records,
+      {
+        ...base,
+        filters: { ...defaults, subject: "etb factura", sender: "marca" },
+      },
+      catalog,
+    ).campaignCount,
+    1,
+  );
+  assert.equal(
+    query(records, { ...base, selected: "Campaña Ágil" }, catalog).catalogDetail
+      .length,
+    2,
+  );
+  const exported = report(
+    records,
+    overview,
+    { filters: defaults, format: "inventory" },
+    catalog,
+  );
+  assert.equal(exported.rowCount, 3);
+  assert.match(exported.content, /Solo catálogo/);
+  assert.match(exported.content, /Correo_Envio/);
+  assert.equal(exported.content.split("\r\n").length, 4);
+  const f = {
+    ...defaults,
+    subject: "factura",
+    sender: "marca",
+    searchIn: "all",
+    catalogPresence: "without",
+  };
+  assert.deepEqual(readHash(makeHash("inventario", f), overview), {
+    view: "inventario",
+    filters: f,
+  });
+});
+
+test("Original source columns and all catalog fields survive record exports; trend metrics agree with counts", () => {
+  const original = {
+    ...row,
+    d: defaults.from,
+    c: "Campaña Ágil",
+    source: {
+      ID: 123,
+      "Spam Complaints Rate": "0.01%",
+      "Launch Date": null,
+      "Sent Date": 45292,
+      "Asunto peligroso": "=1+1",
+    },
+  };
+  const catalog = [
+    {
+      row: 2,
+      fields: {
+        ID: 7,
+        Nombre: "Campaña Ágil",
+        Asunto: "Hola",
+        Correo_Respuesta: "respuesta@etb.com",
+      },
+    },
+  ];
+  const exported = csv([original], defaults, undefined, catalog);
+  assert.match(exported, /Fuente: Spam Complaints Rate/);
+  assert.match(exported, /Catálogo: Correo_Respuesta/);
+  assert.match(exported, /'=1\+1/);
+  const summary = summarize([original], {
+    ...defaults,
+    from: defaults.from,
+    to: defaults.from,
+    period: "custom",
+  });
+  assert.deepEqual(summary.trend[0], {
+    label: defaults.from,
+    value: original.e,
+    opens: original.uo,
+    clicks: original.uc,
+    bounces: original.sb + original.hb,
+    rows: 1,
+  });
+  assert.equal(dataset.catalog?.length, 1812);
+  assert.ok(
+    dataset.records.every(
+      (r) => r.source && Object.keys(r.source).length >= 18,
+    ),
+  );
+});

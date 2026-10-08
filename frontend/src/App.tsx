@@ -15,16 +15,17 @@ import {
   filterValue,
 } from "./lib/analysis";
 import { makeHash, readHash } from "./lib/navigation";
-import { exportCsv, runQuery } from "./lib/client";
-import { integer, pct } from "./lib/numbers";
+import { exportCsv, exportReport, runQuery } from "./lib/client";
+import { integer } from "./lib/numbers";
 import Overview from "./components/Overview";
 import Dialog from "./components/Dialog";
-import Records, { Pager } from "./components/Records";
+import CampaignDetail from "./components/CampaignDetail";
 import { applyTheme, initialTheme, type Theme } from "./lib/theme";
 import { rangeError } from "./lib/reports";
 import { saveDownload } from "./lib/download";
 const Reports = lazy(() => import("./components/Reports"));
 const CampaignsView = lazy(() => import("./views/CampaignsView"));
+const InventoryView = lazy(() => import("./views/InventoryView"));
 const QualityView = lazy(() => import("./views/QualityView"));
 const periodLabels: Record<Period, string> = {
   all: "Histórico",
@@ -212,13 +213,17 @@ function Advanced({
             </select>
           </label>
         </div>
-        <div className="filter-grid" hidden={tab !== "campana"}>
-          <label className="full-field">
+        <div
+          className="filter-grid"
+          data-page={fieldPage}
+          hidden={tab !== "campana"}
+        >
+          <label>
             Buscar campaña
             <input
               type="search"
               value={draft.campaign}
-              placeholder="Nombre de campaña…"
+              placeholder="Palabras, en cualquier orden…"
               onChange={(event) =>
                 setDraft({
                   ...draft,
@@ -228,15 +233,34 @@ function Advanced({
               }
             />
           </label>
-          {draft.campaignExact && (
-            <div className="exact-filter full-field">
-              <small>Campaña exacta</small>
-              <p>{draft.campaignExact}</p>
-              <button type="button" onClick={() => set("campaignExact", "")}>
-                Quitar selección exacta
-              </button>
-            </div>
-          )}
+          <label>
+            Buscar en
+            <select
+              value={draft.searchIn}
+              onChange={(event) => set("searchIn", event.target.value)}
+            >
+              <option value="">Nombre de campaña</option>
+              <option value="all">Todos los campos e ID del catálogo</option>
+            </select>
+          </label>
+          <label>
+            Asunto contiene
+            <input
+              type="search"
+              value={draft.subject}
+              placeholder="Palabras del asunto"
+              onChange={(event) => set("subject", event.target.value)}
+            />
+          </label>
+          <label>
+            Remitente contiene
+            <input
+              type="search"
+              value={draft.sender}
+              placeholder="Nombre o correo"
+              onChange={(event) => set("sender", event.target.value)}
+            />
+          </label>
         </div>
         <div
           className="filter-grid"
@@ -366,8 +390,19 @@ function Advanced({
               ))}
             </select>
           </label>
+          <label>
+            Actividad del catálogo (Inventario)
+            <select
+              value={draft.catalogPresence}
+              onChange={(event) => set("catalogPresence", event.target.value)}
+            >
+              <option value="">Todas las fichas</option>
+              <option value="with">Con registros en el corte</option>
+              <option value="without">Sin registros en el corte</option>
+            </select>
+          </label>
         </div>
-        {tab !== "campana" && (
+        {
           <div className="filter-page">
             <small>Campos {fieldPage} / 2</small>
             <button
@@ -377,14 +412,23 @@ function Advanced({
               {fieldPage === 1 ? "Más campos" : "Campos anteriores"}
             </button>
           </div>
-        )}
+        }
         <p className="filter-note" role={invalid ? "alert" : undefined}>
           {invalid ? (
             invalid
           ) : (
             <>
               Períodos rápidos terminan en {overview.meta.latestSentDate}.
-              Fechas desconocidas se consultan desde Calidad.
+              Búsqueda por palabras, sin distinguir acentos.{" "}
+              {draft.campaignExact && (
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => set("campaignExact", "")}
+                >
+                  Quitar campaña exacta
+                </button>
+              )}
             </>
           )}
         </p>
@@ -421,6 +465,7 @@ export default function App() {
       key: string;
       filtersKey: string;
       selected: string | null;
+      catalogMode: boolean;
       data: QueryResult;
     }>(),
     [loading, setLoading] = useState(false);
@@ -430,14 +475,16 @@ export default function App() {
     [exporting, setExporting] = useState(false);
   useEffect(() => {
     let active = true;
-    fetch(import.meta.env.BASE_URL + "data/overview.json")
+    fetch(import.meta.env.BASE_URL + "data/overview.json", {
+      cache: "no-store",
+    })
       .then((response) => {
         if (!response.ok) throw new Error("No se pudo cargar el resumen");
         return response.json();
       })
       .then((data: OverviewData) => {
         if (
-          data.schemaVersion !== 1 ||
+          data.schemaVersion !== 2 ||
           !data.summaries?.all ||
           !data.meta?.dataHash
         )
@@ -473,6 +520,7 @@ export default function App() {
     };
   }, [overview]);
   function navigate(view: View, filters: Filters) {
+    if (view !== "inventario") filters = { ...filters, catalogPresence: "" };
     const hash = makeHash(view, filters);
     if (location.hash !== hash) history.pushState(null, "", hash);
     setState({ view, filters });
@@ -511,8 +559,14 @@ export default function App() {
       filters.minSends,
       filters.maxSends,
       filters.activity,
+      filters.subject,
+      filters.sender,
+      filters.searchIn,
+      filters.catalogPresence,
     ].some(Boolean);
-  const request = filters ? { ...queryState, filters } : undefined;
+  const request = filters
+    ? { ...queryState, filters, catalogMode: state?.view === "inventario" }
+    : undefined;
   const requestKey = JSON.stringify(request);
   const needsDetail = !!state && (!simple || state.view !== "resumen");
   useEffect(() => {
@@ -530,6 +584,7 @@ export default function App() {
             key: requestKey,
             filtersKey: JSON.stringify(request.filters),
             selected: request.selected,
+            catalogMode: request.catalogMode,
             data,
           });
           setLoading(false);
@@ -546,7 +601,9 @@ export default function App() {
     };
   }, [overview, requestKey, needsDetail]);
   const result =
-    answer && answer.filtersKey === JSON.stringify(filters)
+    answer &&
+    answer.filtersKey === JSON.stringify(filters) &&
+    answer.catalogMode === (state?.view === "inventario")
       ? answer.data
       : undefined;
   const summary =
@@ -559,7 +616,11 @@ export default function App() {
     if (!overview || !filters) return;
     setExporting(true);
     try {
-      const content = await exportCsv(overview, filters, issue);
+      const content =
+        state?.view === "inventario"
+          ? (await exportReport(overview, { filters, format: "inventory" }))
+              .content
+          : await exportCsv(overview, filters, issue);
       saveDownload(
         content,
         `responsys-1.0A-${state!.view}-${filters.from}-${filters.to}.csv`,
@@ -610,6 +671,10 @@ export default function App() {
       "minSends",
       "maxSends",
       "activity",
+      "subject",
+      "sender",
+      "searchIn",
+      "catalogPresence",
     ] as const
   ).filter((key) => filters[key]);
   const synced = new Date(overview.meta.generatedAtUtc),
@@ -640,7 +705,12 @@ export default function App() {
           ).map(([view, label]) => (
             <button
               key={view}
-              aria-current={state.view === view ? "page" : undefined}
+              aria-current={
+                state.view === view ||
+                (state.view === "inventario" && view === "campanas")
+                  ? "page"
+                  : undefined
+              }
               aria-label={label}
               onClick={() => navigate(view, filters)}
             >
@@ -857,6 +927,7 @@ export default function App() {
             <CampaignsView
               result={result}
               request={request}
+              onInventory={() => navigate("inventario", filters)}
               onRequest={(next) =>
                 setQueryState((current) => ({ ...current, ...next }))
               }
@@ -871,6 +942,26 @@ export default function App() {
               exporting={exporting}
             />
           )}{" "}
+          {result && request && state.view === "inventario" && (
+            <InventoryView
+              result={result}
+              request={request}
+              onRequest={(next) =>
+                setQueryState((current) => ({ ...current, ...next }))
+              }
+              onScope={(next) => patch(next)}
+              onPerformance={(name) =>
+                navigate("campanas", {
+                  ...filters,
+                  campaignExact: name || "",
+                  campaign: "",
+                  catalogPresence: "",
+                })
+              }
+              onExport={() => download()}
+              exporting={exporting}
+            />
+          )}
           {result && request && state.view === "calidad" && (
             <QualityView
               overview={overview}
@@ -899,7 +990,9 @@ export default function App() {
         <Advanced
           overview={overview}
           filters={filters}
-          onApply={(next) => navigate(state.view, next)}
+          onApply={(next) =>
+            navigate(next.catalogPresence ? "inventario" : state.view, next)
+          }
           onClose={() => setDialog(null)}
         />
       )}{" "}
@@ -959,6 +1052,7 @@ export default function App() {
       {queryState.selected !== null && state.view === "campanas" && (
         <Dialog
           title={queryState.selected}
+          className="campaign-detail-dialog"
           wide
           onClose={() =>
             setQueryState((current) => ({
@@ -970,47 +1064,11 @@ export default function App() {
         >
           {result?.detail && answer?.selected === queryState.selected ? (
             <>
-              <div className="detail-kpis">
-                <span>
-                  Envíos <strong>{integer(result.detail.sends)}</strong>
-                </span>
-                <span>
-                  Entrega{" "}
-                  <strong>
-                    {result.detail.sends
-                      ? pct(
-                          (result.detail.delivered / result.detail.sends) * 100,
-                        )
-                      : "N/D"}
-                  </strong>
-                </span>
-                <span>
-                  Aperturas <strong>{integer(result.detail.opens)}</strong>
-                </span>
-                <span>
-                  Clics <strong>{integer(result.detail.clicks)}</strong>
-                </span>
-                <span>
-                  Rebotes <strong>{integer(result.detail.bounces)}</strong>
-                </span>
-              </div>
-              <Records
-                rows={result.records}
-                pageSize={queryState.recordPageSize || 1}
-                onCapacity={(recordPageSize) =>
-                  setQueryState((current) => ({
-                    ...current,
-                    recordPageSize,
-                    recordPage: 1,
-                  }))
-                }
-              />
-              <Pager
-                page={queryState.recordPage}
-                count={result.recordCount}
-                pageSize={queryState.recordPageSize}
-                onChange={(recordPage) =>
-                  setQueryState((current) => ({ ...current, recordPage }))
+              <CampaignDetail
+                result={result}
+                request={request!}
+                onRequest={(next) =>
+                  setQueryState((current) => ({ ...current, ...next }))
                 }
               />
             </>

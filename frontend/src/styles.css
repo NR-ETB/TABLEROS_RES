@@ -2076,6 +2076,249 @@ h2 {
 .filter-dialog {
   height: 440px;
 }
+
+/* Inspectable charts and complete source fiches share the operation surfaces. */
+.trend-explorer {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.trend-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.trend-controls select {
+  width: auto;
+  max-width: 50%;
+  font-size: 12px;
+}
+.trend-controls small {
+  color: var(--muted);
+  font-size: 10px;
+  margin-left: auto;
+}
+.trend-inspector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  min-height: 24px;
+  font-size: 12px;
+}
+.trend-scale-note {
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+  line-height: 14px;
+}
+.inventory-coverage {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.inventory-coverage button {
+  position: relative;
+  flex: 1;
+  background: transparent;
+  overflow: hidden;
+  font-size: 12px;
+}
+.inventory-coverage button > span {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--accent);
+}
+.inventory-coverage strong {
+  color: var(--text);
+  margin-right: 4px;
+}
+.trend-inspector strong {
+  color: var(--text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.trend-inspector small {
+  margin-left: auto;
+  color: var(--muted);
+}
+.trend-cursor {
+  accent-color: var(--accent);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  min-height: 44px;
+  height: 44px;
+  width: 100%;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.selection-line {
+  stroke: var(--accent);
+  stroke-dasharray: 3 4;
+  opacity: 0.5;
+  pointer-events: none;
+}
+.catalog-dialog {
+  height: min(600px, calc(100dvh - 32px));
+}
+.field-pages {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.field-page-area {
+  flex: 1;
+  min-height: 0;
+}
+.field-page-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 12px;
+  margin: 0;
+}
+.field-page-grid > div {
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+  min-height: 96px;
+}
+.field-page-grid dt {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.field-page-grid dd {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+.catalog-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.catalog-choice select {
+  flex: 1;
+  min-width: 0;
+}
+.inventory-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.inventory-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.inventory-controls select {
+  width: auto;
+}
+.inventory-panel .inventory-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+.inventory-panel td small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.inventory-panel th:first-child {
+  width: 30%;
+}
+.inventory-panel th:last-child {
+  width: 14%;
+}
+@media (max-width: 850px) {
+  .trend-controls small {
+    display: none;
+  }
+}
+@media (max-width: 650px) {
+  .field-page-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .inventory-controls {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .inventory-controls label {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .inventory-panel .inventory-note {
+    display: none;
+  }
+  .inventory-panel th:nth-child(5) {
+    display: table-cell;
+    width: 30%;
+  }
+  .inventory-panel th:first-child {
+    width: 70%;
+  }
+  .inventory-panel td:nth-child(5) {
+    font-size: 11px;
+  }
+  .field-pages .pager {
+    gap: 4px;
+  }
+  .field-pages .pager span {
+    font-size: 10px;
+  }
+  .field-pages .pager button {
+    padding: 4px 8px;
+  }
+  .trend-inspector {
+    gap: 8px;
+    font-size: 11px;
+  }
+  .trend-inspector strong {
+    font-size: 16px;
+  }
+}
+@media (max-height: 450px) {
+  .trend-inspector {
+    font-size: 10px;
+    min-height: 20px;
+  }
+  .trend-inspector strong {
+    font-size: 14px;
+  }
+  .trend-controls select {
+    min-height: 44px;
+    padding: 4px 8px;
+  }
+  .trend-cursor {
+    height: 44px;
+  }
+  .catalog-dialog,
+  .campaign-detail-dialog {
+    height: calc(100dvh - 16px);
+  }
+  .campaign-detail-dialog .detail-kpis {
+    display: none;
+  }
+  .inventory-panel .inventory-note {
+    display: none;
+  }
+}
 .report-dialog {
   height: 448px;
 }
@@ -2091,5 +2334,115 @@ h2 {
   .filter-dialog,
   .report-dialog {
     height: calc(100dvh - 16px);
+  }
+}
+
+@media (max-height: 500px) and (max-width: 650px) {
+  .inventory-controls label,
+  .inventory-coverage {
+    display: none;
+  }
+}
+
+@media (max-width: 850px) {
+  .view-panel.inventory-panel:not(.quality-panel) th:nth-child(n + 2),
+  .inventory-panel td.secondary-column {
+    display: none;
+  }
+  .view-panel.inventory-panel:not(.quality-panel) th:nth-child(5) {
+    display: table-cell;
+    width: 30%;
+  }
+  .view-panel.inventory-panel:not(.quality-panel) th:first-child {
+    width: 70%;
+  }
+}
+
+.compact-trend-button {
+  display: none;
+  flex-shrink: 0;
+  width: 100%;
+  font-size: 12px;
+}
+.trend-dialog {
+  height: min(500px, calc(100dvh - 32px));
+}
+.trend-dialog label {
+  font-size: 12px;
+}
+.trend-dialog select {
+  display: block;
+  margin-top: 4px;
+}
+.trend-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.trend-values dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+.trend-values dd {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.trend-dialog small {
+  font-size: 11px;
+  color: var(--muted);
+}
+@media (max-height: 600px) {
+  .trend-explorer > .trend-controls,
+  .trend-explorer > .trend-inspector,
+  .trend-explorer > .trend-cursor,
+  .trend-explorer > .trend-scale-note {
+    display: none;
+  }
+  .compact-trend-button {
+    display: block;
+  }
+}
+@media (max-height: 450px) {
+  .app-shell .toolbar {
+    display: none;
+  }
+  .trend-dialog {
+    height: calc(100dvh - 16px);
+  }
+  .trend-values {
+    gap: 8px;
+  }
+  .trend-dialog .trend-cursor {
+    min-height: 44px;
+  }
+}
+
+.inventory-panel .table-scroll {
+  --row-height: 72;
+}
+.inventory-panel thead th {
+  height: 32px;
+}
+
+.inventory-panel thead {
+  height: 32px;
+}
+.inventory-panel .text-button {
+  min-height: 44px;
+}
+@media (max-height: 450px) {
+  .inventory-panel {
+    gap: 4px;
+  }
+  .inventory-panel > .section-heading {
+    padding-bottom: 4px;
+  }
+  .inventory-panel .table-scroll {
+    --row-height: 56;
+  }
+  .inventory-panel td small {
+    display: none;
   }
 }

@@ -71,15 +71,18 @@ def coverage(rows, start, end):
 def summarize(records, start, end, period):
     rows = [r for r in records if r['d'] and start <= r['d'] <= end]
     monthly = (date.fromisoformat(end) - date.fromisoformat(start)).days > 120
-    buckets = defaultdict(int)
+    buckets = defaultdict(list)
     for row in rows:
-        buckets[row['d'][:7] if monthly else row['d']] += row['e']
+        buckets[row['d'][:7] if monthly else row['d']].append(row)
     cursor = date.fromisoformat(start)
     finish = date.fromisoformat(end)
     trend = []
     while cursor <= finish:
         label = cursor.isoformat()[:7] if monthly else cursor.isoformat()
-        trend.append({'label': label, 'value': buckets.get(label)})
+        bucket = buckets.get(label)
+        counts = totals(bucket) if bucket else None
+        trend.append({'label': label, 'value': counts['sends'] if counts else None,
+                      **{key: counts[key] if counts else None for key in ['opens', 'clicks', 'bounces', 'rows']}})
         if monthly:
             cursor = date(cursor.year + (cursor.month == 12), cursor.month % 12 + 1, 1)
         else:
@@ -102,7 +105,7 @@ def build_overview(dataset):
     meta = dataset['meta']
     if not meta['earliestSentDate'] or not meta['latestSentDate']:
         raise ValueError('No dated records: cannot publish an empty dashboard')
-    return {'schemaVersion': 1, 'meta': meta, 'filters': dataset['filters'],
+    return {'schemaVersion': 2, 'meta': meta, 'filters': dataset['filters'],
             'sourceQuality': dataset['quality'],
             'summaries': {period: summarize(dataset['records'], *period_dates(meta, period), period)
                           for period in ['all', 'last30', 'last90', 'latestYear']}}

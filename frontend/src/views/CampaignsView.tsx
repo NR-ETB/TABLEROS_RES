@@ -9,6 +9,7 @@ export default function CampaignsView({
   onSelect,
   onExport,
   exporting,
+  onInventory,
 }: {
   result: QueryResult;
   request: Query;
@@ -16,6 +17,7 @@ export default function CampaignsView({
   onSelect: (name: string) => void;
   onExport: () => void;
   exporting: boolean;
+  onInventory: () => void;
 }) {
   const table = usePageCapacity(
     request.pageSize || 1,
@@ -42,6 +44,10 @@ export default function CampaignsView({
         <button className="primary" disabled={exporting} onClick={onExport}>
           {exporting ? "Preparando…" : "Exportar registros CSV"}
         </button>
+      </div>
+      <div className="panel-tabs">
+        <button aria-pressed>Rendimiento</button>
+        <button onClick={onInventory}>Inventario completo</button>
       </div>
       <div className="table-scroll" ref={table} aria-label="Campañas paginadas">
         <table>

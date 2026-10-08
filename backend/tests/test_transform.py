@@ -64,3 +64,18 @@ class TransformTests(unittest.TestCase):
         frames[mod.FOLDER_SHEET] = pd.DataFrame(columns=['Nombre'])
         with self.assertRaisesRegex(ValueError, 'missing columns'):
             mod.make_dataset(frames, 'xlsx')
+
+
+    def test_all_catalog_columns_and_original_statistics_are_preserved(self):
+        frames = {name: pd.DataFrame(columns=mod.STAT_COLUMNS) for name in mod.STAT_SHEETS}
+        frames[mod.STAT_SHEETS[0]] = pd.DataFrame([{'Campaña':'Campaña','Sent Date':'2024-01-01','Envios':10,'Soft Bounces':0,'Hard Bounces':0,'Unique Opens':3,'Unique Clicks':1,'Open Rate':'200%','ID':77}])
+        frames[mod.CAMPAIGN_SHEET] = pd.DataFrame([{'Nombre':'Campaña','ID':1,'Estado':'CLOSED','Asunto':'Anterior'},{'Nombre':'Campaña','ID':2,'Estado':'ACTIVE','Asunto':'Nueva','Correo_Respuesta':'respuesta@etb.com'},{'Nombre':'Solo catálogo','ID':3}])
+        frames[mod.FOLDER_SHEET] = pd.DataFrame(columns=['Nombre'])
+        data = mod.make_dataset(frames,'snapshot-google')
+        self.assertEqual(len(data['catalog']),3)
+        self.assertEqual(data['records'][0]['s'],'ACTIVE')
+        self.assertEqual(data['records'][0]['source']['Open Rate'],'200%')
+        self.assertEqual(data['records'][0]['source']['ID'],77)
+        self.assertEqual(data['totals']['sends'],10)
+        self.assertEqual(data['quality']['duplicateCampaignCatalogKeys'],1)
+        self.assertEqual(data['catalog'][1]['fields']['Correo_Respuesta'],'respuesta@etb.com')

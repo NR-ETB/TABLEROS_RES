@@ -6,6 +6,7 @@ import {
   totals,
   filterLabels,
   filterValue,
+  inventory,
 } from "./analysis.ts";
 import type {
   OverviewData,
@@ -13,6 +14,7 @@ import type {
   ReportRequest,
   ReportResult,
   Totals,
+  CatalogEntry,
 } from "../types.ts";
 
 export function validDate(value: string): boolean {
@@ -97,13 +99,41 @@ export function report(
   records: RecordRow[],
   overview: OverviewData,
   request: ReportRequest,
+  catalog: CatalogEntry[] = [],
 ): ReportResult {
   const { filters, format, issue } = request;
   const invalid = rangeError(filters.from, filters.to);
   if (invalid) throw new Error(invalid);
+  if (format === "inventory") {
+    const entries = inventory(catalog, records, filters);
+    const keys = [
+      ...new Set(catalog.flatMap((entry) => Object.keys(entry.fields))),
+    ];
+    return {
+      rowCount: entries.length,
+      content: encode([
+        [
+          "Fila catálogo",
+          ...keys,
+          "Registros en el corte",
+          "Desde actividad",
+          "Hasta actividad",
+        ],
+        ...entries.map((entry) => [
+          entry.row,
+          ...keys.map((key) => entry.fields[key] ?? ""),
+          entry.activity,
+          filters.from,
+          filters.to,
+        ]),
+      ]),
+    };
+  }
   let rows = filterRows(
     records.filter((r) => !!r.d && r.d >= filters.from && r.d <= filters.to),
     filters,
+    true,
+    catalog,
   );
   if (format === "quality")
     rows = rows.filter((r) =>
@@ -112,7 +142,10 @@ export function report(
         : Object.values(flags(r)).some(Boolean),
     );
   if (format === "records" || format === "quality")
-    return { content: csv(rows, filters), rowCount: rows.length };
+    return {
+      content: csv(rows, filters, undefined, catalog),
+      rowCount: rows.length,
+    };
   const groups = groupRows(rows, format === "days" ? "d" : "c");
   if (format !== "html")
     return {

@@ -1,5 +1,6 @@
 import type {
   DashboardData,
+  CatalogEntry,
   Filters,
   Group,
   Issue,
@@ -29,6 +30,10 @@ export const filterLabels: Record<string, string> = {
   minSends: "Envíos mínimos",
   maxSends: "Envíos máximos",
   activity: "Actividad",
+  subject: "Asunto contiene",
+  sender: "Remitente contiene",
+  searchIn: "Buscar en",
+  catalogPresence: "Actividad del catálogo",
 };
 export const issueLabels: Record<Issue, string> = {
   missingCampaign: "Campaña ausente",
@@ -40,6 +45,12 @@ export const issueLabels: Record<Issue, string> = {
   withoutDate: "Fecha desconocida",
 };
 export function filterValue(key: string, value: string): string {
+  if (key === "searchIn")
+    return value === "all" ? "Todos los campos" : "Nombre";
+  if (key === "catalogPresence")
+    return value === "with"
+      ? "Con registros en el corte"
+      : "Sin registros en el corte";
   if (key === "activity")
     return (
       (
@@ -98,6 +109,10 @@ export function defaultFilters(meta: DashboardData["meta"]): Filters {
     minSends: "",
     maxSends: "",
     activity: "",
+    subject: "",
+    sender: "",
+    searchIn: "",
+    catalogPresence: "",
   };
 }
 export function flags(row: RecordRow): Record<Issue, boolean> {
@@ -116,8 +131,43 @@ export function filterRows(
   records: RecordRow[],
   filters: Filters,
   dated = true,
+  catalog: CatalogEntry[] = [],
 ): RecordRow[] {
-  const search = filters.campaign.trim().toLocaleLowerCase("es");
+  const search = fold(filters.campaign).split(/\s+/).filter(Boolean);
+  const index = catalogIndex(catalog);
+  const nameCache = new Map<string, string>(),
+    textCache = new Map<string, string>();
+  const normalizedName = (name: string) => {
+    let key = nameCache.get(name);
+    if (key === undefined) {
+      key = fold(name);
+      nameCache.set(name, key);
+    }
+    return key;
+  };
+  const matchingKeys = (
+    search: string,
+    text: (entry: CatalogEntry) => string,
+  ) =>
+    search
+      ? new Set(
+          [...index]
+            .filter(([, entries]) =>
+              entries.some((entry) => matches(text(entry), search)),
+            )
+            .map(([key]) => key),
+        )
+      : null;
+  const subjects = matchingKeys(filters.subject, (entry) =>
+    String(entry.fields.Asunto || ""),
+  );
+  const senders = matchingKeys(filters.sender, (entry) =>
+    [
+      entry.fields.Nombre_Envio,
+      entry.fields.Correo_Envio,
+      entry.fields.Correo_Respuesta,
+    ].join(" "),
+  );
   return records.filter((row) => {
     if (
       dated &&
@@ -134,13 +184,7 @@ export function filterRows(
     if (filters.type && (row.t || "Sin dato") !== filters.type) return false;
     if (filters.status && (row.s || "Sin dato") !== filters.status)
       return false;
-    if (
-      filters.list &&
-      !row.l
-        .toLocaleLowerCase("es")
-        .includes(filters.list.trim().toLocaleLowerCase("es"))
-    )
-      return false;
+    if (filters.list && !matches(row.l, filters.list)) return false;
     if (filters.sourceYear && row.sy !== Number(filters.sourceYear))
       return false;
     if (filters.minSends !== "" && row.e < Number(filters.minSends))
@@ -160,7 +204,29 @@ export function filterRows(
       (row.c || "Sin dato") !== filters.campaignExact
     )
       return false;
-    if (search && !row.c.toLocaleLowerCase("es").includes(search)) return false;
+    const key =
+      subjects || senders || search.length ? normalizedName(row.c) : "";
+    if (subjects && !subjects.has(key)) return false;
+    if (senders && !senders.has(key)) return false;
+    if (search.length) {
+      let text = key;
+      if (filters.searchIn === "all") {
+        const original = [row.c, row.g, row.f, row.p, row.l].join(" ");
+        text = textCache.get(original) || "";
+        if (!text) {
+          text = fold(
+            [
+              original,
+              ...(index.get(key) || []).flatMap((entry) =>
+                Object.values(entry.fields),
+              ),
+            ].join(" "),
+          );
+          textCache.set(original, text);
+        }
+      }
+      if (!search.every((word) => text.includes(word))) return false;
+    }
     if (filters.quality === "fullMatch" && !(row.cm && row.fm)) return false;
     if (
       filters.quality === "anomalyRows" &&
@@ -224,20 +290,124 @@ const coverage = (rows: RecordRow[], from: string, to: string) => ({
   daysWithRecords: new Set(rows.filter((r) => r.d).map((r) => r.d)).size,
   calendarDays: Math.round((utc(to) - utc(from)) / DAY) + 1,
 });
-export function summarize(records: RecordRow[], filters: Filters): Summary {
-  const rows = filterRows(records, filters);
+export const fold = (text: string) =>
+  text
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es")
+    .replace(/\s+/g, " ")
+    .trim();
+export const matches = (text: string, search: string) =>
+  fold(search)
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((word) => fold(text).includes(word));
+const indexes = new WeakMap<CatalogEntry[], Map<string, CatalogEntry[]>>();
+function catalogIndex(catalog: CatalogEntry[]) {
+  let index = indexes.get(catalog);
+  if (!index) {
+    index = new Map();
+    for (const entry of catalog) {
+      const key = fold(String(entry.fields.Nombre || ""));
+      index.set(key, [...(index.get(key) || []), entry]);
+    }
+    indexes.set(catalog, index);
+  }
+  return index;
+}
+export function inventory(
+  catalog: CatalogEntry[],
+  records: RecordRow[],
+  filters: Filters,
+) {
+  const activity = new Map<string, number>(),
+    originals = new Map<string, number>();
+  for (const row of filterRows(records, {
+    ...filters,
+    campaign: "",
+    campaignExact: "",
+    subject: "",
+    sender: "",
+    searchIn: "",
+  }))
+    originals.set(row.c, (originals.get(row.c) || 0) + 1);
+  for (const [name, count] of originals) {
+    const key = fold(name);
+    activity.set(key, (activity.get(key) || 0) + count);
+  }
+  const fields = {
+    purpose: "Proposito",
+    folder: "Folder",
+    type: "Tipo",
+    status: "Estado",
+  };
+  return catalog
+    .filter((entry) => {
+      const f = entry.fields,
+        name = String(f.Nombre || "");
+      if (filters.campaignExact && name !== filters.campaignExact) return false;
+      if (
+        !matches(
+          filters.searchIn === "all" ? Object.values(f).join(" ") : name,
+          filters.campaign,
+        )
+      )
+        return false;
+      if (
+        !matches(String(f.Asunto || ""), filters.subject) ||
+        !matches(
+          [f.Nombre_Envio, f.Correo_Envio, f.Correo_Respuesta].join(" "),
+          filters.sender,
+        ) ||
+        !matches(String(f.Lista || ""), filters.list)
+      )
+        return false;
+      for (const [key, column] of Object.entries(fields))
+        if (
+          filters[key as keyof Filters] &&
+          String(f[column] || "Sin dato") !== filters[key as keyof Filters]
+        )
+          return false;
+      const count = activity.get(fold(name)) || 0;
+      return (
+        !filters.catalogPresence ||
+        (filters.catalogPresence === "with" ? count > 0 : count === 0)
+      );
+    })
+    .map((entry) => ({
+      ...entry,
+      activity: activity.get(fold(String(entry.fields.Nombre || ""))) || 0,
+    }));
+}
+export function summarize(
+  records: RecordRow[],
+  filters: Filters,
+  catalog: CatalogEntry[] = [],
+): Summary {
+  const rows = filterRows(records, filters, true, catalog);
   const { from, to } = filters;
   const monthly = utc(to) - utc(from) > 120 * DAY;
-  const buckets = new Map<string, number>();
+  const buckets = new Map<string, RecordRow[]>();
   for (const row of rows)
     if (row.d) {
       const label = row.d.slice(0, monthly ? 7 : 10);
-      buckets.set(label, (buckets.get(label) || 0) + row.e);
+      const bucket = buckets.get(label);
+      if (bucket) bucket.push(row);
+      else buckets.set(label, [row]);
     }
   const trend: Summary["trend"] = [];
-  for (let cursor = utc(from); cursor <= utc(to);) {
+  for (let cursor = utc(from); cursor <= utc(to); ) {
     const label = iso(cursor).slice(0, monthly ? 7 : 10);
-    trend.push({ label, value: buckets.get(label) ?? null });
+    const bucket = buckets.get(label),
+      count = bucket ? totals(bucket) : null;
+    trend.push({
+      label,
+      value: count?.sends ?? null,
+      opens: count?.opens ?? null,
+      clicks: count?.clicks ?? null,
+      bounces: count?.bounces ?? null,
+      rows: count?.rows ?? null,
+    });
     if (monthly) {
       const date = new Date(cursor);
       cursor = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
@@ -265,11 +435,16 @@ export function summarize(records: RecordRow[], filters: Filters): Summary {
   if (filters.period !== "all" && filters.quality !== "withoutDate") {
     const previousTo = iso(utc(from) - DAY),
       previousFrom = iso(utc(previousTo) - (utc(to) - utc(from)));
-    const previousRows = filterRows(records, {
-      ...filters,
-      from: previousFrom,
-      to: previousTo,
-    });
+    const previousRows = filterRows(
+      records,
+      {
+        ...filters,
+        from: previousFrom,
+        to: previousTo,
+      },
+      true,
+      catalog,
+    );
     comparison = {
       from: previousFrom,
       to: previousTo,
@@ -290,8 +465,12 @@ export function summarize(records: RecordRow[], filters: Filters): Summary {
     quality,
   };
 }
-export function query(records: RecordRow[], request: Query): QueryResult {
-  const rows = filterRows(records, request.filters);
+export function query(
+  records: RecordRow[],
+  request: Query,
+  catalog: CatalogEntry[] = [],
+): QueryResult {
+  const rows = filterRows(records, request.filters, true, catalog);
   const grouped = new Map<string, RecordRow[]>();
   for (const row of rows) {
     const name = row.c || "Sin dato";
@@ -322,8 +501,48 @@ export function query(records: RecordRow[], request: Query): QueryResult {
     Number.isFinite(value) ? Math.max(1, Math.min(25, Math.floor(value!))) : 25;
   const pageSize = size(request.pageSize),
     recordPageSize = size(request.recordPageSize);
+  const catalogRows = request.catalogMode
+    ? inventory(catalog, records, request.filters).sort(
+        (a, b) =>
+          textOrder(String(a.fields.Nombre), String(b.fields.Nombre)) ||
+          a.row - b.row,
+      )
+    : [];
+  const unique = (key: keyof RecordRow) => [
+    ...new Set(detailRows.map((r) => String(r[key] || "Sin dato"))),
+  ];
+  const dates = detailRows
+    .map((r) => r.d)
+    .filter(Boolean)
+    .sort();
   return {
-    summary: summarize(records, request.filters),
+    summary: summarize(records, request.filters, catalog),
+    inventory: catalogRows.slice(
+      (request.page - 1) * pageSize,
+      request.page * pageSize,
+    ),
+    inventoryCount: catalogRows.length,
+    inventoryCoverage: {
+      withRecords: catalogRows.filter((entry) => entry.activity > 0).length,
+      withoutRecords: catalogRows.filter((entry) => !entry.activity).length,
+    },
+    catalogDetail:
+      request.selected === null
+        ? []
+        : catalogIndex(catalog).get(fold(request.selected)) || [],
+    campaignInfo:
+      request.selected === null
+        ? null
+        : {
+            from: dates[0] || "",
+            to: dates.at(-1) || "",
+            folders: unique("f"),
+            programs: unique("g"),
+            purposes: unique("p"),
+            types: unique("t"),
+            statuses: unique("s"),
+            lists: unique("l"),
+          },
     campaigns: campaigns.slice(
       (request.page - 1) * pageSize,
       request.page * pageSize,
@@ -341,8 +560,9 @@ export function csv(
   records: RecordRow[],
   filters: Filters,
   issue?: string,
+  catalog: CatalogEntry[] = [],
 ): string {
-  const rows = filterRows(records, filters).filter(
+  const rows = filterRows(records, filters, true, catalog).filter(
     (row) =>
       !issue ||
       (issue === "all"
@@ -373,28 +593,57 @@ export function csv(
     "Cruce campaña",
     "Cruce folder",
   ];
+  const sourceKeys = [
+    ...new Set(rows.flatMap((row) => Object.keys(row.source || {}))),
+  ];
+  const catalogKeys = [
+    ...new Set(catalog.flatMap((entry) => Object.keys(entry.fields))),
+  ];
+  const index = catalogIndex(catalog);
   return (
     "\uFEFF" +
     [
-      header,
-      ...rows.map((r) => [
-        r.d,
-        r.sy,
-        r.p,
-        r.c,
-        r.f,
-        r.g,
-        r.e,
-        r.sb,
-        r.hb,
-        r.uo,
-        r.uc,
-        r.t,
-        r.s,
-        r.l,
-        r.cm,
-        r.fm,
-      ]),
+      [
+        ...header,
+        ...sourceKeys.map((key) => `Fuente: ${key}`),
+        ...catalogKeys.map((key) => `Catálogo: ${key}`),
+      ],
+      ...rows.map((r) => {
+        const entries = index.get(fold(r.c)) || [];
+        const selected = [...entries].sort(
+          (a, b) =>
+            Number(
+              ["ACTIVE", "A", "ACTIVO"].includes(
+                String(b.fields.Estado).toUpperCase(),
+              ),
+            ) -
+              Number(
+                ["ACTIVE", "A", "ACTIVO"].includes(
+                  String(a.fields.Estado).toUpperCase(),
+                ),
+              ) || Number(b.fields.ID || 0) - Number(a.fields.ID || 0),
+        )[0];
+        return [
+          r.d,
+          r.sy,
+          r.p,
+          r.c,
+          r.f,
+          r.g,
+          r.e,
+          r.sb,
+          r.hb,
+          r.uo,
+          r.uc,
+          r.t,
+          r.s,
+          r.l,
+          r.cm,
+          r.fm,
+          ...sourceKeys.map((key) => r.source?.[key] ?? ""),
+          ...catalogKeys.map((key) => selected?.fields[key] ?? ""),
+        ];
+      }),
     ]
       .map((row) => row.map(escape).join(";"))
       .join("\r\n")

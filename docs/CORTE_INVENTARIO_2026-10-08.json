@@ -1,0 +1,27 @@
+{
+  "source": "Google Sheets, lectura autenticada de rangos A:R y catalogo A:K",
+  "previous": {
+    "cut": "2026-09-08",
+    "hash": "1ff90bb8129c2372",
+    "totals": {
+      "sends": 35623363,
+      "softBounces": 9420087,
+      "hardBounces": 559915,
+      "uniqueOpens": 4875960,
+      "uniqueClicks": 1310354
+    }
+  },
+  "current": {
+    "cut": "2026-10-08",
+    "hash": "110951ba71d44cc0",
+    "totals": {
+      "sends": 35622302,
+      "softBounces": 9420071,
+      "hardBounces": 559913,
+      "uniqueOpens": 4875777,
+      "uniqueClicks": 1310329
+    },
+    "records": 32804,
+    "catalog": 1812
+  }
+}

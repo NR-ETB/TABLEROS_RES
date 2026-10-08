@@ -10,10 +10,10 @@ class PagesHandler(SimpleHTTPRequestHandler):
     fault = ''
 
     def do_GET(self):
-        if (self.fault == 'overview' and self.path.endswith('/overview.json')) or (self.fault == 'detail' and self.path.endswith('/dashboard.json')) or (self.fault == 'worker' and '/analysis.worker-' in self.path):
+        if (self.fault == 'overview' and self.path.endswith('/overview.json')) or (self.fault == 'detail' and self.path.split('?')[0].endswith('/dashboard.json')) or (self.fault == 'worker' and '/analysis.worker-' in self.path):
             self.send_error(503, 'Simulated unavailable resource')
             return
-        if self.fault == 'hash' and self.path.endswith('/dashboard.json'):
+        if self.fault == 'hash' and self.path.split('?')[0].endswith('/dashboard.json'):
             data = json.loads(Path('frontend/dist/data/dashboard.json').read_text(encoding='utf-8'))
             data['meta']['dataHash'] = 'simulated-different-cutoff'
             encoded = json.dumps(data).encode('utf-8')

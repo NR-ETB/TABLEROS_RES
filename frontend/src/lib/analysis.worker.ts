@@ -19,21 +19,23 @@ onmessage = async ({
   report?: ReportRequest;
 }>) => {
   try {
-    detail ??= fetch(import.meta.env.BASE_URL + "data/dashboard.json").then(
-      (response) => {
-        if (!response.ok) throw new Error("No se pudo cargar el detalle");
-        return response.json();
-      },
-    );
+    detail ??= fetch(
+      import.meta.env.BASE_URL +
+        "data/dashboard.json?cut=" +
+        encodeURIComponent(data.overview.meta.dataHash),
+    ).then((response) => {
+      if (!response.ok) throw new Error("No se pudo cargar el detalle");
+      return response.json();
+    });
     const dataset = await detail;
     validateDetail(dataset, data.overview);
     postMessage({
       id: data.id,
       result: data.report
-        ? report(dataset.records, data.overview, data.report)
+        ? report(dataset.records, data.overview, data.report, dataset.catalog)
         : data.query
-          ? query(dataset.records, data.query)
-          : csv(dataset.records, data.filters!, data.issue),
+          ? query(dataset.records, data.query, dataset.catalog)
+          : csv(dataset.records, data.filters!, data.issue, dataset.catalog),
     });
   } catch (error) {
     detail = undefined;

@@ -29,7 +29,13 @@ def validate(dataset):
     for name, key in [('sends', 'e'), ('softBounces', 'sb'), ('hardBounces', 'hb'), ('uniqueOpens', 'uo'), ('uniqueClicks', 'uc')]:
         if dataset['totals'][name] != sum(row[key] for row in rows):
             raise ValueError(f'Total mismatch: {name}')
-    basis = json.dumps({'records': rows, 'quality': dataset['quality']}, ensure_ascii=False, separators=(',', ':'), sort_keys=True).encode('utf-8')
+    content = {'records': rows, 'quality': dataset['quality']}
+    if 'catalog' in dataset:
+        content['catalog'] = dataset['catalog']
+        for entry in dataset['catalog']:
+            if not isinstance(entry.get('fields'), dict) or not entry['fields'].get('Nombre'):
+                raise ValueError('Invalid campaign catalog entry')
+    basis = json.dumps(content, ensure_ascii=False, separators=(',', ':'), sort_keys=True).encode('utf-8')
     if hashlib.sha256(basis).hexdigest()[:16] != meta['dataHash']:
         raise ValueError('Data fingerprint mismatch')
 

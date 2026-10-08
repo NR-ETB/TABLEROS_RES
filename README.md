@@ -1,5 +1,7 @@
 # ETB · Responsys 1.0A
 
+La mejora del 8 de octubre añade Inventario completo (1.812 fichas), campos originales de estadísticas y catálogo, búsqueda por asunto/remitente/ID y gráficas con métricas, barras y consulta exacta por período. Pautas visuales en [.interface-design/system.md](.interface-design/system.md); alcance y validación en [docs/INVENTARIO_VISUAL_2026-10-08.md](docs/INVENTARIO_VISUAL_2026-10-08.md). El resumen usa contrato v2 y mantiene la carga inicial por debajo de 50 KB.
+
 Tablero de rendimiento de campañas con identidad ETB, indicadores en una franja continua y vidrio discreto en controles y paneles flotantes. Publicación estática en [GitHub Pages](https://nr-etb.github.io/TABLEROS_RES/).
 
 ## Arquitectura y datos

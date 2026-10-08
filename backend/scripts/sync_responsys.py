@@ -206,6 +206,23 @@ def make_dataset(frames: dict[str, pd.DataFrame], source_mode: str) -> dict[str,
     campaign_catalog, campaign_keys, duplicate_campaign_keys = choose_campaign_catalog(frames[CAMPAIGN_SHEET])
     folder_keys, _ = folder_catalog(frames[FOLDER_SHEET])
 
+    # Preserve every catalog row and column, including duplicate names and entries
+    # without statistics. The selected join still follows ACTIVE / largest ID.
+    def source_value(value):
+        if value is None or pd.isna(value):
+            return None
+        if isinstance(value, (datetime, pd.Timestamp)):
+            return value.isoformat()
+        if isinstance(value, (int, float)):
+            return value if math.isfinite(value) else None
+        return str(value)
+
+    catalog_rows = [
+        {'row': int(index) + 2, 'fields': {str(key): source_value(value) for key, value in row.items()}}
+        for index, row in frames[CAMPAIGN_SHEET].iterrows()
+        if normalize_key(row.get('Nombre'))
+    ]
+
     records: list[dict[str, Any]] = []
     unmatched_campaigns: dict[str, int] = {}
     unmatched_folders: dict[str, int] = {}
@@ -265,6 +282,7 @@ def make_dataset(frames: dict[str, pd.DataFrame], source_mode: str) -> dict[str,
                 bad_rate_rows += 1
 
             records.append({
+                "source": {str(key): source_value(value) for key, value in row.items()},
                 "d": date,
                 "sy": sheet_year,
                 "p": clean_text(row.get("Proposito")) or meta.get("purpose", ""),
@@ -320,6 +338,9 @@ def make_dataset(frames: dict[str, pd.DataFrame], source_mode: str) -> dict[str,
         "statuses": sorted({r["s"] for r in records if r["s"]}),
     }
 
+    for name, column in [('purposes','Proposito'),('folders','Folder'),('types','Tipo'),('statuses','Estado')]:
+        filters[name] = sorted(set(filters[name]) | {clean_text(entry['fields'].get(column)) for entry in catalog_rows if clean_text(entry['fields'].get(column))})
+
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     dataset = {
         "meta": {
@@ -353,11 +374,12 @@ def make_dataset(frames: dict[str, pd.DataFrame], source_mode: str) -> dict[str,
         },
         "filters": filters,
         "records": records,
+        "catalog": catalog_rows,
     }
 
     # Fingerprint excludes generatedAt so it represents data content, not build time.
     fingerprint_basis = json.dumps(
-        {"records": records, "quality": dataset["quality"]},
+        {"records": records, "quality": dataset["quality"], "catalog": catalog_rows},
         ensure_ascii=False,
         separators=(",", ":"),
         sort_keys=True,

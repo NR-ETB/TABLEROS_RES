@@ -24,7 +24,11 @@ async function fallback(
   issue?: string,
   reportRequest?: ReportRequest,
 ) {
-  detail ??= fetch(import.meta.env.BASE_URL + "data/dashboard.json")
+  detail ??= fetch(
+    import.meta.env.BASE_URL +
+      "data/dashboard.json?cut=" +
+      encodeURIComponent(overview.meta.dataHash),
+  )
     .then((response) => {
       if (!response.ok) throw new Error("No se pudo cargar el detalle");
       return response.json();
@@ -36,10 +40,10 @@ async function fallback(
   const data = await detail;
   validateDetail(data, overview);
   return reportRequest
-    ? report(data.records, overview, reportRequest)
+    ? report(data.records, overview, reportRequest, data.catalog)
     : request
-      ? query(data.records, request)
-      : csv(data.records, filters!, issue);
+      ? query(data.records, request, data.catalog)
+      : csv(data.records, filters!, issue, data.catalog);
 }
 function run(
   overview: OverviewData,

@@ -2,10 +2,10 @@
   "meta": {
     "title": "Inventario Responsys",
     "spreadsheetId": "1widnx3vomsT6j0Z3jpfh7IASwNd-Bix_lBXgp2tdVVQ",
-    "sourceMode": "xlsx",
-    "generatedAtUtc": "2026-09-08T17:26:48+00:00",
+    "sourceMode": "snapshot-google",
+    "generatedAtUtc": "2026-10-08T22:04:03+00:00",
     "earliestSentDate": "2024-01-01",
-    "latestSentDate": "2026-09-08",
+    "latestSentDate": "2026-10-08",
     "rowCount": 32804,
     "formulaNotes": {
       "deliveryRate": "(Envios - Soft Bounces - Hard Bounces) / Envios",
@@ -14,14 +14,14 @@
       "bounceRate": "(Soft Bounces + Hard Bounces) / Envios",
       "temporalTruth": "Sent Date; Año_Evento y nombre de pestaña se conservan solo para control de calidad"
     },
-    "dataHash": "1ff90bb8129c2372"
+    "dataHash": "110951ba71d44cc0"
   },
   "quality": {
     "campaignMatchPct": 99.582,
     "folderMatchPct": 99.976,
     "unmatchedCampaignRows": 137,
     "unmatchedFolderRows": 8,
-    "sourceYearMismatchRows": 904,
+    "sourceYearMismatchRows": 906,
     "rowsWithoutSentDate": 0,
     "calculatedRateOver100Rows": 384,
     "duplicateCampaignCatalogKeys": 1,

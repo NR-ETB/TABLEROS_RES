@@ -7,7 +7,9 @@ export function readHash(
 ): { view: View; filters: Filters } {
   const [path, search = ""] = hash.replace(/^#\/?/, "").split("?");
   const view = (
-    ["resumen", "campanas", "calidad"].includes(path) ? path : "resumen"
+    ["resumen", "campanas", "calidad", "inventario"].includes(path)
+      ? path
+      : "resumen"
   ) as View;
   const params = new URLSearchParams(search),
     filters = defaultFilters(overview.meta);
@@ -31,6 +33,10 @@ export function readHash(
     "minSends",
     "maxSends",
     "activity",
+    "subject",
+    "sender",
+    "searchIn",
+    "catalogPresence",
   ] as const)
     filters[key] = params.get(key) || "";
   for (const key of ["minSends", "maxSends", "sourceYear"] as const)
@@ -50,6 +56,10 @@ export function readHash(
   }
   if (!["", "opens", "clicks", "bounces", "none"].includes(filters.activity))
     filters.activity = "";
+  if (!["", "all"].includes(filters.searchIn)) filters.searchIn = "";
+  if (!["", "with", "without"].includes(filters.catalogPresence))
+    filters.catalogPresence = "";
+  if (view !== "inventario") filters.catalogPresence = "";
   if (filters.period === "custom") {
     const valid = (value: string | null) =>
       !!value &&

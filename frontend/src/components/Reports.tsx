@@ -13,6 +13,7 @@ const formats: Record<ReportFormat, string> = {
   records: "Registros completos · CSV para Excel",
   quality: "Incidencias · CSV para Excel",
   html: "Informe imprimible · HTML",
+  inventory: "Catálogo completo · CSV (actividad del corte)",
 };
 export default function Reports({
   overview,
@@ -69,7 +70,7 @@ export default function Reports({
         html ? "text/html;charset=utf-8" : "text/csv;charset=utf-8",
       );
       setMessage(
-        `Descargado · ${integer(result.rowCount)} registros. ${result.rowCount ? "" : "La selección no tiene registros."}`,
+        `Descargado · ${integer(result.rowCount)} ${format === "inventory" ? "fichas" : "registros"}. ${result.rowCount ? "" : "La selección está vacía."}`,
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -211,13 +212,17 @@ export default function Reports({
           <p className="filter-note">
             {format === "html"
               ? "Resumen, campañas y procedencia. Ábrelo para imprimir o guardar como PDF."
-              : "Todas las filas de la selección. Archivo con separador punto y coma y codificación UTF-8."}
+              : format === "inventory"
+                ? "Todas las fichas del catálogo filtrado. Las fechas describen su actividad, no su fecha de creación. Conserva duplicados."
+                : "Todas las filas de la selección. Archivo con separador punto y coma y codificación UTF-8."}
           </p>
         </div>
         <p className="filter-note" role={error ? "alert" : "status"}>
           {error ||
             message ||
-            "Fechas inclusivas. Registros sin fecha excluidos. No cambia los filtros del tablero."}
+            (format === "inventory"
+              ? "Catálogo completo con actividad en el rango inclusivo elegido."
+              : "Fechas inclusivas. Registros sin fecha excluidos. No cambia los filtros del tablero.")}
         </p>
         <div className="dialog-actions">
           <button type="button" onClick={onClose}>

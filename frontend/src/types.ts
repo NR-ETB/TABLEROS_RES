@@ -1,4 +1,5 @@
 export type RecordRow = {
+  source?: Record<string, string | number | null>;
   d: string;
   sy: number;
   p: string;
@@ -18,6 +19,7 @@ export type RecordRow = {
 };
 
 export type DashboardData = {
+  catalog?: CatalogEntry[];
   meta: {
     title: string;
     spreadsheetId: string;
@@ -70,10 +72,19 @@ export type Filters = {
   minSends: string;
   maxSends: string;
   activity: string;
+  subject: string;
+  sender: string;
+  searchIn: string;
+  catalogPresence: string;
 };
 
 export type ReportFormat =
-  "campaigns" | "days" | "records" | "quality" | "html";
+  | "campaigns"
+  | "days"
+  | "records"
+  | "quality"
+  | "html"
+  | "inventory";
 export type ReportRequest = {
   filters: Filters;
   format: ReportFormat;
@@ -82,7 +93,11 @@ export type ReportRequest = {
 export type ReportResult = { content: string; rowCount: number };
 
 export type Period = "all" | "last30" | "last90" | "latestYear" | "custom";
-export type View = "resumen" | "campanas" | "calidad";
+export type View = "resumen" | "campanas" | "calidad" | "inventario";
+export type CatalogEntry = {
+  row: number;
+  fields: Record<string, string | number | null>;
+};
 export type Totals = {
   sends: number;
   opens: number;
@@ -115,14 +130,21 @@ export type Summary = {
     totals: Totals;
     coverage: Coverage;
   } | null;
-  trend: { label: string; value: number | null }[];
+  trend: {
+    label: string;
+    value: number | null;
+    opens: number | null;
+    clicks: number | null;
+    bounces: number | null;
+    rows: number | null;
+  }[];
   topCampaigns: Group[];
   folders: Group[];
   purposes: Group[];
   quality: Quality;
 };
 export type OverviewData = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   meta: DashboardData["meta"];
   filters: DashboardData["filters"];
   sourceQuality: DashboardData["quality"];
@@ -139,6 +161,7 @@ export type Query = {
   issue: string;
   pageSize?: number;
   recordPageSize?: number;
+  catalogMode?: boolean;
 };
 export type QueryResult = {
   summary: Summary;
@@ -147,4 +170,18 @@ export type QueryResult = {
   records: RecordRow[];
   recordCount: number;
   detail: Totals | null;
+  inventory: (CatalogEntry & { activity: number })[];
+  inventoryCount: number;
+  inventoryCoverage: { withRecords: number; withoutRecords: number };
+  catalogDetail: CatalogEntry[];
+  campaignInfo: {
+    from: string;
+    to: string;
+    folders: string[];
+    programs: string[];
+    purposes: string[];
+    types: string[];
+    statuses: string[];
+    lists: string[];
+  } | null;
 };
